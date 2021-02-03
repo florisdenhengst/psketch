@@ -1,0 +1,5 @@
+pyyaml
+scikit-image
+mpi4py
+psutil
+tensorflow

@@ -121,7 +121,8 @@ class CurriculumTrainer(object):
 
         task_probs = []
         while i_iter < N_ITERS:
-            logging.info("[max steps] %d", max_steps)
+            logging.debug("[iteration] %d", i_iter)
+            logging.debug("[max steps] %d", max_steps)
             min_reward = np.inf
 
             # TODO refactor
@@ -141,7 +142,7 @@ class CurriculumTrainer(object):
                 count = 0.
                 task_rewards = defaultdict(lambda: 0)
                 task_counts = defaultdict(lambda: 0)
-                for j in range(N_UPDATE):
+                for j in range(N_UPDATE): # FdH: set to 500
                     err = None
                     # get enough samples for one training step
                     while err is None:

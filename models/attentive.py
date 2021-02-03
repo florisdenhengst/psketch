@@ -1,4 +1,4 @@
-import net
+from . import net
 
 import numpy as np
 import tensorflow as tf
@@ -26,7 +26,7 @@ class AttentiveModel(object):
                 np.zeros((N_BATCH, N_HIDDEN), dtype=np.float32))
 
         def predictor(scope):
-            with tf.variable_scope(scope) as vs:
+            with tf.compat.v1.variable_scope(scope) as vs:
                 t_episode_features = tf.placeholder(tf.float32,
                             shape=(N_BATCH, MAX_REPLAY_LEN, world.n_features))
                 t_episode_lengths = tf.placeholder(tf.int32, shape=(N_BATCH,))
@@ -81,7 +81,7 @@ class AttentiveModel(object):
         t_chosen_scores = tf.reduce_sum(t_ep_scores * t_actions, reduction_indices=(2,))
         t_max_scores_next = tf.reduce_max(t_ep_scores_next, reduction_indices=(2,))
         t_td = t_rewards + DISCOUNT * t_max_scores_next - t_chosen_scores
-        t_err = tf.reduce_mean(tf.square(t_td))
+        t_err = tf.reduce_mean(tf.math.square(t_td))
         opt = tf.train.AdamOptimizer()
         t_train_op = opt.minimize(t_err, var_list=v_weights)
         t_assign_ops = [wn.assign(w) for (w, wn) in zip(v_weights, v_weights_next)]

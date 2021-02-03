@@ -19,11 +19,11 @@ class TrustRegionOptimizer(object):
         for k in self.actors:
             actor = self.actors[k]
             scratch_actor = self.scratch_actors[k]
-            t_loss = -tf.reduce_sum(tf.exp(scratch_actor.t_chosen_prob - actor.t_chosen_prob) *
+            t_loss = -tf.math.reduce_sum(tf.exp(scratch_actor.t_chosen_prob - actor.t_chosen_prob) *
                     self.inputs.t_reward)
-            #t_kl = tf.reduce_sum(actor.t_probs * tf.log(actor.t_probs - scratch_actor.t_probs),
-            #        reduction_indices=(1,))
-            t_kl = tf.reduce_sum(tf.exp(actor.t_probs) * (actor.t_probs - scratch_actor.t_probs))
+            #t_kl = tf.math.reduce_sum(actor.t_probs * tf.log(actor.t_probs - scratch_actor.t_probs),
+            #        axis=(1,))
+            t_kl = tf.math.reduce_sum(tf.exp(actor.t_probs) * (actor.t_probs - scratch_actor.t_probs))
             self.loss_grads[k] = tf.gradients(t_loss, scratch_actor.params)
             self.kls[k] = t_kl
 

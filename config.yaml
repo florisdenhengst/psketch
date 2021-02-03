@@ -1,7 +1,8 @@
-name: light_joint-feat-plan
+name: light_joint-feat-plan-fdh
 recipes: "resources/light/recipes.yaml"
+seed: 0
 world: 
-  name: LightWorld
+  name: LightWorld 
 model: 
   name: ModularACModel
   use_args: false

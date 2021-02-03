@@ -1,5 +1,5 @@
 from misc import util
-import net
+from . import net
 
 from collections import namedtuple, defaultdict
 import logging
@@ -37,7 +37,7 @@ class ModularACModel(object):
     def __init__(self, config):
         self.experiences = []
         self.world = None
-        tf.set_random_seed(0)
+        tf.random.set_seed(config.seed)
         self.next_actor_seed = 0
         self.config = config
 
@@ -58,10 +58,10 @@ class ModularACModel(object):
         self.t_n_steps = tf.Variable(1., name="n_steps")
         self.t_inc_steps = self.t_n_steps.assign(self.t_n_steps + 1)
         # TODO configurable optimizer
-        self.optimizer = tf.train.RMSPropOptimizer(0.001)
+        self.optimizer = tf.compat.v1.train.RMSPropOptimizer(0.001)
 
         def build_actor(index, t_input, t_action_mask, extra_params=[]):
-            with tf.variable_scope("actor_%s" % index):
+            with tf.compat.v1.variable_scope("actor_%s" % index):
                 t_action_score, v_action = net.mlp(t_input, (N_HIDDEN, self.n_actions))
 
                 # TODO this is pretty gross
@@ -70,17 +70,17 @@ class ModularACModel(object):
                 t_decrement_op = v_bias[-1].assign(v_bias[-1] - 3)
 
                 t_action_logprobs = tf.nn.log_softmax(t_action_score)
-                t_chosen_prob = tf.reduce_sum(t_action_mask * t_action_logprobs, 
-                        reduction_indices=(1,))
+                t_chosen_prob = tf.math.reduce_sum(t_action_mask * t_action_logprobs, 
+                        axis=(1,))
 
             return ActorModule(t_action_logprobs, t_chosen_prob, 
                     v_action+extra_params, t_decrement_op)
 
         def build_critic(index, t_input, t_reward, extra_params=[]):
-            with tf.variable_scope("critic_%s" % index):
+            with tf.compat.v1.variable_scope("critic_%s" % index):
                 if self.config.model.baseline in ("task", "common"):
-                    t_value = tf.get_variable("b", shape=(),
-                            initializer=tf.constant_initializer(0.0))
+                    t_value = tf.compat.v1.get_variable("b", shape=(),
+                            initializer=tf.compat.v1.constant_initializer(0.0))
                     v_value = [t_value]
                 elif self.config.model.baseline == "state":
                     t_value, v_value = net.mlp(t_input, (1,))
@@ -93,8 +93,8 @@ class ModularACModel(object):
         def build_actor_trainer(actor, critic, t_reward):
             t_advantage = t_reward - critic.t_value
             # TODO configurable entropy regularizer
-            actor_loss = -tf.reduce_sum(actor.t_chosen_prob * t_advantage) + \
-                    0.001 * tf.reduce_sum(tf.exp(actor.t_probs) * actor.t_probs)
+            actor_loss = -tf.math.reduce_sum(actor.t_chosen_prob * t_advantage) + \
+                    0.001 * tf.math.reduce_sum(tf.exp(actor.t_probs) * actor.t_probs)
             actor_grad = tf.gradients(actor_loss, actor.params)
             actor_trainer = Trainer(actor_loss, actor_grad, 
                     self.optimizer.minimize(actor_loss, var_list=actor.params))
@@ -102,18 +102,17 @@ class ModularACModel(object):
 
         def build_critic_trainer(t_reward, critic):
             t_advantage = t_reward - critic.t_value
-            critic_loss = tf.reduce_sum(tf.square(t_advantage))
-            critic_grad = tf.gradients(critic_loss, critic.params)
-            critic_trainer = Trainer(critic_loss, critic_grad,
-                    self.optimizer.minimize(critic_loss, var_list=critic.params))
+            critic_loss = tf.math.reduce_sum(tf.math.square(t_advantage))
+            critic_grad = tf.compat.v1.gradients(critic_loss, critic.params)
+            critic_trainer = Trainer(critic_loss, critic_grad, self.optimizer.minimize(critic_loss, var_list=critic.params))
             return critic_trainer
 
         # placeholders
-        t_arg = tf.placeholder(tf.int32, shape=(None,))
-        t_step = tf.placeholder(tf.float32, shape=(None, 1))
-        t_feats = tf.placeholder(tf.float32, shape=(None, self.n_features))
-        t_action_mask = tf.placeholder(tf.float32, shape=(None, self.n_actions))
-        t_reward = tf.placeholder(tf.float32, shape=(None,))
+        t_arg = tf.compat.v1.placeholder(tf.int32, shape=(None,))
+        t_step = tf.compat.v1.placeholder(tf.float32, shape=(None, 1))
+        t_feats = tf.compat.v1.placeholder(tf.float32, shape=(None, self.n_features))
+        t_action_mask = tf.compat.v1.placeholder(tf.float32, shape=(None, self.n_actions))
+        t_reward = tf.compat.v1.placeholder(tf.float32, shape=(None,))
 
         if self.config.model.use_args:
             t_embed, v_embed = net.embed(t_arg, len(trainer.cookbook.index),
@@ -148,6 +147,7 @@ class ModularACModel(object):
             for i_module in range(self.n_modules):
                 critics[i_task, i_module] = critic
 
+        print("building more critics for {} modules with {} tasks".format(self.n_modules, self.n_tasks))
         for i_module in range(self.n_modules):
             for i_task in range(self.n_tasks):
                 critic = critics[i_task, i_module]
@@ -160,14 +160,14 @@ class ModularACModel(object):
 
         self.t_gradient_placeholders = {}
         self.t_update_gradient_op = None
-
+        
         params = []
-        for module in actors.values() + critics.values():
+        for module in list(actors.values()) + list(critics.values()):
             params += module.params
-        self.saver = tf.train.Saver()
+        self.saver = tf.compat.v1.train.Saver()
 
-        self.session = tf.Session()
-        self.session.run(tf.initialize_all_variables())
+        self.session = tf.compat.v1.Session()
+        self.session.run(tf.compat.v1.initialize_all_variables())
         self.session.run([actor.t_decrement_op for actor in actors.values()])
 
         self.actors = actors
@@ -294,7 +294,7 @@ class ModularACModel(object):
 
         grads = {}
         params = {}
-        for module in self.actors.values() + self.critics.values():
+        for module in list(self.actors.values()) + list(self.critics.values()):
             for param in module.params:
                 if param.name not in grads:
                     grads[param.name] = np.zeros(param.get_shape(), np.float32)
@@ -359,7 +359,7 @@ class ModularACModel(object):
             grad = grads[k]
             grad *= rescale
             if k not in self.t_gradient_placeholders:
-                self.t_gradient_placeholders[k] = tf.placeholder(tf.float32, grad.shape)
+                self.t_gradient_placeholders[k] = tf.compat.v1.placeholder(tf.float32, grad.shape)
             feed_dict[self.t_gradient_placeholders[k]] = grad
             updates.append((self.t_gradient_placeholders[k], param))
         if self.t_update_gradient_op is None:

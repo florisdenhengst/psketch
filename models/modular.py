@@ -1,5 +1,5 @@
 from misc import util
-import net
+from . import net
 
 from collections import namedtuple, defaultdict
 import numpy as np
@@ -67,7 +67,7 @@ class ModularModel(object):
             t_score_chosen = tf.reduce_sum(mod.t_scores * t_actions, reduction_indices=(1,))
             t_score_n_best = tf.reduce_max(mod_n.t_scores_n, reduction_indices=(1,))
             t_td = t_rewards + DISCOUNT * t_score_n_best - t_score_chosen
-            t_err = tf.reduce_mean(tf.minimum(tf.square(t_td), 1))
+            t_err = tf.reduce_mean(tf.minimum(tf.math.square(t_td), 1))
             t_train_op = opt.minimize(t_err, var_list=mod.v)
             return (t_train_op, t_err)
 

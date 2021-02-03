@@ -1,6 +1,8 @@
-from cookbook import Cookbook
+from .cookbook import Cookbook
 
 import numpy as np
+import logging
+import copy
 
 DOWN = 0
 UP = 1
@@ -16,13 +18,14 @@ class LightWorld(object):
         self.n_actions = 5
         self.n_features = 12
         self.cookbook = Cookbook(config.recipes)
+        # TODO FdH: inherit global random state
         self.random = np.random.RandomState(0)
 
     def sample_scenario_with_goal(self, goal):
-        goal = self.cookbook.index.get(goal)
+        self.goal = self.cookbook.index.get(goal)
         def walk():
             x, y = 0, 0
-            for c in goal:
+            for c in self.goal:
                 if c == "L":
                     x -= 1
                 elif c == "R":
@@ -41,7 +44,6 @@ class LightWorld(object):
             r = max(r, x)
             u = min(u, y)
             d = max(d, y)
-
         l -= self.random.randint(2)
         r += self.random.randint(2)
         u -= self.random.randint(2)
@@ -49,12 +51,13 @@ class LightWorld(object):
 
         rooms_x = r - l + 1
         rooms_y = d - u + 1
+
         init_x = -l
         init_y = -u
 
         board_w = ROOM_W * rooms_x + 1
         board_h = ROOM_H * rooms_y + 1
-        walls = np.zeros((board_w, board_h))
+        walls = np.zeros((board_w, board_h), dtype='int')
         walls[0::ROOM_W, :] = 1
         walls[:, 0::ROOM_H] = 1
         
@@ -68,13 +71,13 @@ class LightWorld(object):
         for x, y in walk():
             dx = x - px
             dy = y - py
-            cx = ROOM_W * (init_x + px) + ROOM_W / 2
-            cy = ROOM_H * (init_y + py) + ROOM_H / 2             
-            wx = cx + ROOM_W / 2 * dx
-            wy = cy + ROOM_H / 2 * dy
-            kx = cx + self.random.randint(ROOM_W / 2 + 1) - 1
-            ky = cy + self.random.randint(ROOM_H / 2 + 1) - 1
-            walls[wx, wy] = 0
+            cx = int(ROOM_W * (init_x + px) + ROOM_W / 2)
+            cy = int(ROOM_H * (init_y + py) + ROOM_H / 2)
+            wx = int(cx + ROOM_W / 2 * dx)
+            wy = int(cy + ROOM_H / 2 * dy)
+            kx = int(cx + self.random.randint(ROOM_W / 2 + 1) - 1)
+            ky = int(cy + self.random.randint(ROOM_H / 2 + 1) - 1)
+            walls[wx][wy] = 0
             doors.append((wx, wy))
             if self.random.rand() < 0.5:
                 keys[(kx, ky)] = (wx, wy)
@@ -87,15 +90,15 @@ class LightWorld(object):
             px = self.random.randint(rooms_x-1)
             py = self.random.randint(rooms_y-1)
             dx, dy = (1, 0) if self.random.randint(2) else (0, 1)
-            cx = ROOM_W * px + ROOM_W / 2
-            cy = ROOM_H * py + ROOM_H / 2
-            wx = cx + ROOM_W / 2 * dx
-            wy = cy + ROOM_H / 2 * dy
+            cx = int(ROOM_W * px + ROOM_W / 2)
+            cy = int(ROOM_H * py + ROOM_H / 2)
+            wx = int(cx + ROOM_W / 2 * dx)
+            wy = int(cy + ROOM_H / 2 * dy)
             if (wx, wy) in doors:
                 continue
-            kx = cx + self.random.randint(ROOM_W / 2 + 1) - 1
-            ky = cy + self.random.randint(ROOM_H / 2 + 1) - 1
-            walls[wx, wy] = 0
+            kx = int(cx + self.random.randint(ROOM_W / 2 + 1) - 1)
+            ky = int(cy + self.random.randint(ROOM_H / 2 + 1) - 1)
+            walls[wx][wy] = 0
             doors.append((wx, wy))
             if self.random.rand() < 0.5:
                 keys[(kx, ky)] = (wx, wy)
@@ -174,10 +177,24 @@ class LightScenario(object):
 
     def init(self):
         ix, iy = self.init_room
-        ix = ROOM_W * ix + ROOM_W / 2
-        iy = ROOM_H * iy + ROOM_H / 2
+        ix = int(ROOM_W * ix + ROOM_W / 2)
+        iy = int(ROOM_H * iy + ROOM_H / 2)
         s = LightState(self.walls, self.doors, self.keys, (ix, iy), self)
         return s
+
+    def __str__(self):
+        printmatrix = self.walls.astype('str')
+        printmatrix[printmatrix == '1'] = '·'
+        printmatrix[printmatrix == '0'] = ' '
+        for (c, ((kx, ky), (wx, wy))) in enumerate(self.keys.items()):
+            printmatrix[kx][ky] = str(c)
+            printmatrix[wx][wy] = str(c)
+        to_print = ['init room: {} goal room: {} hint: {}\n'.format(self.init_room,self.goal_room, self.world.goal)]
+        for i in printmatrix:
+            for j in i:
+                to_print.append(j)
+            to_print.append('\n')
+        return ''.join(to_print)
 
 class LightState(object):
     def __init__(self, walls, doors, keys, pos, scenario):
@@ -198,16 +215,20 @@ class LightState(object):
                 else:
                     out[4:8] += df
             for key in self.keys:
-                kf = self.scenario.key_features[key][self.pos[0], self.pos[1], :]
+                kf = self.scenario.key_features[key][self.pos[0]][self.pos[1]][:]
                 out[8:12] += kf
             self._cached_features = out
         return self._cached_features
 
         #return self.scenario.features[self.pos[0], self.pos[1], :]
 
+    def position_to_room(self, x, y):
+        return (int(x / ROOM_W), int(y / ROOM_H))
+
     def satisfies(self, goal_name, goal_arg):
-        px, py = self.pos
-        return (px / ROOM_W, py / ROOM_H) == self.scenario.goal_room
+        room = self.position_to_room(*self.pos)
+        sat = room == self.scenario.goal_room
+        return sat
 
     def step(self, action):
         x, y = self.pos
