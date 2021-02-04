@@ -5,4 +5,3 @@
 # General
 * Define global random state, set seed from config
 * Check random seed usage -> should all use global random state
-* Export version requirements into requirements.txt (export env)
