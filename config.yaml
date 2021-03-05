@@ -1,4 +1,4 @@
-name: light_joint-feat-plan-fdh
+name: light_joint-plan-0
 recipes: "resources/light/recipes.yaml"
 seed: 0
 world: 
@@ -6,6 +6,7 @@ world:
 model: 
   name: ModularACModel
   use_args: false
+  # whether the task ID (sequence of actions) is fed to the agent in a 1-hot encoding and with shared networks
   featurize_plan: true
   max_subtask_timesteps: 15
   baseline: state

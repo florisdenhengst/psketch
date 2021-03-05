@@ -26,7 +26,7 @@ class CurriculumTrainer(object):
             self.hints = yaml.load(hints_f)
 
         # initialize randomness
-        self.random = np.random.RandomState(0)
+        self.random = np.random.RandomState(config.seed)
 
         # organize task and subtask indices
         self.tasks_by_subtask = defaultdict(list)
@@ -57,7 +57,7 @@ class CurriculumTrainer(object):
         goal_names = []
         goal_args = []
 
-        # choose tasks and initialize model
+        # choose N_BATCH tasks and initialize model N_BATCH times
         for _ in range(N_BATCH):
             task = possible_tasks[self.random.choice(
                 len(possible_tasks), p=task_probs)]
@@ -74,10 +74,11 @@ class CurriculumTrainer(object):
         # initialize timer
         total_reward = 0.
         timer = self.config.trainer.max_timesteps
-        done = [False for _ in range(N_BATCH)]
+        done = [False,] * N_BATCH
 
         # act!
         while not all(done) and timer > 0:
+            # takes N_BATCH steps simultaneously
             mstates_before = model.get_state()
             action, terminate = model.act(states_before)
             mstates_after = model.get_state()
@@ -112,7 +113,8 @@ class CurriculumTrainer(object):
     def train(self, model, world):
         model.prepare(world, self)
         #model.load()
-        subtasks = self.tasks_by_subtask.keys()
+        subtasks = sorted(self.tasks_by_subtask.keys())
+        # the maximum length of the sequence of symbolic actions for training (task length)
         if self.config.trainer.use_curriculum:
             max_steps = 1
         else:
@@ -120,7 +122,7 @@ class CurriculumTrainer(object):
         i_iter = 0
 
         task_probs = []
-        while i_iter < N_ITERS:
+        while i_iter < N_ITERS: # FdH: N_ITERS = 30K
             logging.debug("[iteration] %d", i_iter)
             logging.debug("[max steps] %d", max_steps)
             min_reward = np.inf
@@ -131,33 +133,40 @@ class CurriculumTrainer(object):
                 possible_tasks = self.tasks
                 possible_tasks = [t for t in possible_tasks if len(t.steps) <= max_steps]
                 if len(possible_tasks) == 0:
+                    # skip, there are no tasks with this number of actions
                     continue
 
                 # re-initialize task probs if necessary
                 if len(task_probs) != len(possible_tasks):
+                    # uniform initialization over all possible tasks
                     task_probs = np.ones(len(possible_tasks)) / len(possible_tasks)
 
-                total_reward = 0.
+                total_reward = 0. # FdH: total avg reward
                 total_err = 0.
+                total_reward_episodes = 0.
+                errs = []
                 count = 0.
                 task_rewards = defaultdict(lambda: 0)
                 task_counts = defaultdict(lambda: 0)
-                for j in range(N_UPDATE): # FdH: set to 500
+                for j in range(N_UPDATE): # FdH: N_UPDATE=500
                     err = None
                     # get enough samples for one training step
                     while err is None:
                         i_iter += N_BATCH
-                        transitions, reward = self.do_rollout(model, world, 
-                                possible_tasks, task_probs)
-                        for t in transitions:
-                            tr = sum(tt.r for tt in t)
-                            task_rewards[t[0].m1.task] += tr
-                            task_counts[t[0].m1.task] += 1
+                        # list of episodes (list of transitions) and avg reward?
+                        episodes, reward = self.do_rollout(model, world, 
+                                possible_tasks, task_probs) # produces N_BATCH = 100 episodes
+                        for e in episodes:
+                            tr = sum(tt.r for tt in e)
+                            task_rewards[e[0].m1.task] += tr
+                            task_counts[e[0].m1.task] += 1
+                            total_reward_episodes += tr
                         total_reward += reward
                         count += 1
-                        for t in transitions:
-                            model.experience(t)
+                        for e in episodes:
+                            model.experience(e)
                         err = model.train()
+                        errs.append(err)
                     total_err += err
 
                 # log
@@ -173,11 +182,11 @@ class CurriculumTrainer(object):
                             score)
                     scores.append(score)
                 logging.info("")
-                logging.info("[rollout0] %s", [t.a for t in transitions[0]])
-                logging.info("[rollout1] %s", [t.a for t in transitions[1]])
-                logging.info("[rollout2] %s", [t.a for t in transitions[2]])
+                logging.info("[n episodes] %s", len(episodes))
+                logging.info("[count] %d", count)
+                # reward here denotes % of successful runs in [0,1]
                 logging.info("[reward] %s", total_reward / count)
-                logging.info("[error] %s", err / N_UPDATE)
+                logging.info("[error] %s", total_err / N_UPDATE)
                 logging.info("")
                 min_reward = min(min_reward, min(scores))
 

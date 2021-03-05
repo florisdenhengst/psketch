@@ -37,24 +37,34 @@ class ModularACModel(object):
     def __init__(self, config):
         self.experiences = []
         self.world = None
-        tf.random.set_seed(config.seed)
-        self.next_actor_seed = 0
+        self.next_actor_seed = config.seed
         self.config = config
 
     def prepare(self, world, trainer):
+        """
+        Set up model for a given world and trainer:
+        * Set up n actor models for n symbolic actions ('steps')
+        * Set up m critic models for m tasks
+        """
         assert self.world is None
         self.world = world
         self.trainer = trainer
 
+        # number of tasks
         self.n_tasks = len(trainer.task_index)
+        # number of symbolic actions
         self.n_modules = len(trainer.subtask_index)
+        # max number of actions per task
         self.max_task_steps = max(len(t.steps) for t in trainer.task_index.contents.keys())
         if self.config.model.featurize_plan:
             self.n_features = world.n_features + self.n_modules * self.max_task_steps
         else:
             self.n_features = world.n_features
-
+        
+        # number of actions in the world + 'STOP'
         self.n_actions = world.n_actions + 1
+        self.STOP = self.n_actions - 1
+        # number of times train() has been completed
         self.t_n_steps = tf.Variable(1., name="n_steps")
         self.t_inc_steps = self.t_n_steps.assign(self.t_n_steps + 1)
         # TODO configurable optimizer
@@ -123,9 +133,13 @@ class ModularACModel(object):
             t_input = t_feats
             xp = []
 
+        # maps symbolic actions ('modules') -> actors
         actors = {}
+        # maps (task, action)-tuples -> actor trainers with 1 trainer per tuple
         actor_trainers = {}
+        # maps (task, action)-tuples -> critics with 1 critic per task
         critics = {}
+        # maps (task, action)-tuples -> critic trainers with 1 trainer per tuple
         critic_trainers = {}
 
         if self.config.model.featurize_plan:
@@ -145,9 +159,9 @@ class ModularACModel(object):
             else:
                 critic = build_critic(i_task, t_input, t_reward, extra_params=xp)
             for i_module in range(self.n_modules):
-                critics[i_task, i_module] = critic
+                # NOTE FdH: could remove the duplication over modules? Because each task get a critic, not each task-module tuple
+                critics[(i_task, i_module)] = critic
 
-        print("building more critics for {} modules with {} tasks".format(self.n_modules, self.n_tasks))
         for i_module in range(self.n_modules):
             for i_task in range(self.n_tasks):
                 critic = critics[i_task, i_module]
@@ -190,6 +204,7 @@ class ModularACModel(object):
             self.subtasks.append(tuple(subtasks))
             self.args.append(tuple(args))
             self.i_task.append(self.trainer.task_index[tasks[i]])
+        # list storing the subtask for each episode
         self.i_subtask = [0 for _ in range(n_act_batch)]
         self.i_step = np.zeros((n_act_batch, 1))
         self.randoms = []
@@ -202,6 +217,9 @@ class ModularACModel(object):
                 os.path.join(self.config.experiment_dir, "modular_ac.chk"))
 
     def load(self):
+        """
+        Loads parameters from file.
+        """
         path = os.path.join(self.config.experiment_dir, "modular_ac.chk")
         logging.info("loaded %s", path)
         self.saver.restore(self.session, path)
@@ -213,6 +231,10 @@ class ModularACModel(object):
             n_transition = transition._replace(r=running_reward)
             if n_transition.a < self.n_actions:
                 self.experiences.append(n_transition)
+            else:
+                # FdH: end-state action is not appended to the experience tuple 
+                pass
+
 
     def featurize(self, state, mstate):
         if self.config.model.featurize_plan:
@@ -229,15 +251,16 @@ class ModularACModel(object):
         by_mod = defaultdict(list)
         n_act_batch = len(self.i_subtask)
 
+        # by_mod maps (task, subtask) tuples to indices of episodes in the batch
         for i in range(n_act_batch):
             by_mod[self.i_task[i], self.i_subtask[i]].append(i)
+
 
         action = [None] * n_act_batch
         terminate = [None] * n_act_batch
 
         for k, indices in by_mod.items():
             i_task, i_subtask = k
-            assert len(set(self.subtasks[i] for i in indices)) == 1
             if i_subtask >= len(self.subtasks[indices[0]]):
                 continue
             actor = self.actors[self.subtasks[indices[0]][i_subtask]]
@@ -252,17 +275,19 @@ class ModularACModel(object):
             for pr, i in zip(probs, indices):
 
                 if self.i_step[i] >= self.config.model.max_subtask_timesteps:
-                    a = self.n_actions
+                    # Force the 'STOP' action
+                    a = self.STOP
                 else:
                     a = self.randoms[i].choice(self.n_actions, p=pr)
 
-                if a >= self.world.n_actions:
+                if a == self.STOP:
                     self.i_subtask[i] += 1
                     self.i_step[i] = 0.
+                elif a > self.n_actions - 1:
+                    raise ValueError('Action with index "{}" not available in {}+{}={}'.format(self.world.n_actions, 1, self.n_actions))
                 t = self.i_subtask[i] >= len(self.subtasks[indices[0]])
                 action[i] = a
                 terminate[i] = t
-
         return action, terminate
 
     def get_state(self):
@@ -284,10 +309,13 @@ class ModularACModel(object):
             experiences = self.experiences
         else:
             experiences = [e for e in self.experiences if e.m1.action == action]
-        if len(experiences) < N_UPDATE:
+        if len(experiences) < N_UPDATE: # 2000
             return None
+        # Select first experience tuples from batch (experience = s,a,r,s')
+        # Note FdH: should be randomly sampling? (experiences are cleared, so only new exps
         batch = experiences[:N_UPDATE]
 
+        # mapping modules, i.e. (task, symbolic action) tuples, to list of episodes
         by_mod = defaultdict(list)
         for e in batch:
             by_mod[e.m1.task, e.m1.action].append(e)
@@ -303,18 +331,22 @@ class ModularACModel(object):
 
         total_actor_err = 0
         total_critic_err = 0
-        for i_task, i_mod1 in by_mod:
-            actor = self.actors[i_mod1]
-            critic = self.critics[i_task, i_mod1]
+        # this loop determines the gradients for both critic and actor networks
+        for i_task, i_mod1 in sorted(by_mod):
+            actor = self.actors[i_mod1] # actor for this symbolic action
+            critic = self.critics[i_task, i_mod1] # critic for this task + symbolic action?
             actor_trainer = self.actor_trainers[i_task, i_mod1]
             critic_trainer = self.critic_trainers[i_task, i_mod1]
 
+            # episodes for this (task, symbolic action) tuple
             all_exps = by_mod[i_task, i_mod1]
+            # FdH: is i_batch ever > 0? since len(all_exps) is always < N_BATCH (subset of)
             for i_batch in range(int(np.ceil(1. * len(all_exps) / N_BATCH))):
                 exps = all_exps[i_batch * N_BATCH : (i_batch + 1) * N_BATCH]
                 s1, m1, a, s2, m2, r = zip(*exps)
                 feats1 = [self.featurize(s, m) for s, m in zip(s1, m1)]
                 args1 = [m.arg for m in m1]
+                # steps are the symbolic actions to in a task
                 steps1 = [m.step for m in m1]
                 a_mask = np.zeros((len(exps), self.n_actions))
                 for i_datum, aa in enumerate(a):
@@ -344,8 +376,9 @@ class ModularACModel(object):
                     for param, grad in zip(critic.params, critic_grad):
                         increment_sparse_or_dense(grads[param.name], grad)
                         touched.add(param.name)
-
-        global_norm = 0
+       
+        # normalize and rescale the gradients
+        global_norm = 0.0
         for k in params:
             grads[k] /= N_UPDATE
             global_norm += (grads[k] ** 2).sum()
@@ -366,6 +399,7 @@ class ModularACModel(object):
             self.t_update_gradient_op = self.optimizer.apply_gradients(updates)
         self.session.run(self.t_update_gradient_op, feed_dict=feed_dict)
 
+        # Clear experiences
         self.experiences = []
         self.session.run(self.t_inc_steps)
 

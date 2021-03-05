@@ -9,17 +9,23 @@ UP = 1
 LEFT = 2
 RIGHT = 3
 USE = 4
+# STOP: 5
 
 ROOM_W = 6
 ROOM_H = 6
+# TODO FdH: fix
+#P_KEY_PER_ROOM = 0.5
+P_KEY_PER_ROOM = 0.0
+
+BOARD_SIZE_BOUND = 2
 
 class LightWorld(object):
     def __init__(self, config):
         self.n_actions = 5
         self.n_features = 12
         self.cookbook = Cookbook(config.recipes)
-        # TODO FdH: inherit global random state
-        self.random = np.random.RandomState(0)
+        # NOTE FdH: use its own random state to ensure generating the same worlds
+        self.random = np.random.RandomState(config.seed)
 
     def sample_scenario_with_goal(self, goal):
         self.goal = self.cookbook.index.get(goal)
@@ -37,17 +43,16 @@ class LightWorld(object):
                 yield x, y
 
         # figure out board size
-
         l, r, u, d = 0, 0, 0, 0
         for x, y in walk():
             l = min(l, x)
             r = max(r, x)
             u = min(u, y)
             d = max(d, y)
-        l -= self.random.randint(2)
-        r += self.random.randint(2)
-        u -= self.random.randint(2)
-        d += self.random.randint(2)
+        l -= self.random.randint(BOARD_SIZE_BOUND)
+        r += self.random.randint(BOARD_SIZE_BOUND)
+        u -= self.random.randint(BOARD_SIZE_BOUND)
+        d += self.random.randint(BOARD_SIZE_BOUND)
 
         rooms_x = r - l + 1
         rooms_y = d - u + 1
@@ -61,7 +66,10 @@ class LightWorld(object):
         walls[0::ROOM_W, :] = 1
         walls[:, 0::ROOM_H] = 1
         
+        # List of (int:x,int:y) positions of doors
         doors = []
+        # Map {(int:key_x,int:key_y): (int:door_x, int:door_y)} for position of
+        # keys and correspodning doors
         keys = {}
 
         # create doors
@@ -79,7 +87,7 @@ class LightWorld(object):
             ky = int(cy + self.random.randint(ROOM_H / 2 + 1) - 1)
             walls[wx][wy] = 0
             doors.append((wx, wy))
-            if self.random.rand() < 0.5:
+            if self.random.rand() < P_KEY_PER_ROOM:
                 keys[(kx, ky)] = (wx, wy)
             px, py = x, y
 
@@ -100,52 +108,58 @@ class LightWorld(object):
             ky = int(cy + self.random.randint(ROOM_H / 2 + 1) - 1)
             walls[wx][wy] = 0
             doors.append((wx, wy))
-            if self.random.rand() < 0.5:
+            if self.random.rand() < P_KEY_PER_ROOM:
                 keys[(kx, ky)] = (wx, wy)
 
         # precompute features
-
         door_features = {d: np.zeros((board_w, board_h, 4)) for d in doors}
         key_features = {k: np.zeros((board_w, board_h, 4)) for k in keys}
         for x in range(board_w):
             for y in range(board_h):
-                rx = x / ROOM_W
-                ry = y / ROOM_H
+                # room x and room y
+                rx = int(x / ROOM_W)
+                ry = int(y / ROOM_H)
                 for dx, dy in doors:
-                    #if dx / ROOM_W != rx or dy / ROOM_H != ry:
-                    #    continue
-                    if rx not in ((dx + 1) / ROOM_W, (dx - 1) / ROOM_W):
+                    if rx not in (int((dx + 1.0) / ROOM_W), int((dx - 1.0) / ROOM_W)):
                         continue
-                    if ry not in ((dy + 1) / ROOM_H, (dy - 1) / ROOM_H):
+                    if ry not in (int((dy + 1.0) / ROOM_H), int((dy - 1.0) / ROOM_H)):
                         continue
                     if (x, y) != (dx, dy) and (x % ROOM_W == 0 or y % ROOM_H == 0):
                         continue
-                    strength = 10 - np.sqrt(np.square((x - dx, y - dy)).sum())
-                    strength = max(strength, 0)
-                    strength /= 10
+                    strength = 10.0 - np.sqrt(np.square((x - dx, y - dy)).sum())
+                    strength = max(strength, 0.0)
+                    strength /= 10.0
                     if dx <= x:
+                        # door is to the left
                         door_features[dx, dy][x, y, 0] += strength
                     if dx >= x:
+                        # door is to the right
                         door_features[dx, dy][x, y, 1] += strength
                     if dy <= y:
+                        # door is up 
                         door_features[dx, dy][x, y, 2] += strength
                     if dy >= y:
+                        # door is down
                         door_features[dx, dy][x, y, 3] += strength
                 for kx, ky in keys:
-                    if kx / ROOM_W != rx or ky / ROOM_H != ry:
+                    if int(kx / ROOM_W) != rx or int(ky / ROOM_H) != ry:
                         continue
                     if x % ROOM_W == 0 or y % ROOM_H == 0:
                         continue
                     strength = 10 - np.sqrt(np.square((x - kx, y - ky)).sum())
-                    strength = max(strength, 0)
-                    strength /= 10
+                    strength = max(strength, 0.0)
+                    strength /= 10.0
                     if kx <= x:
+                        # key is to the left
                         key_features[kx, ky][x, y, 0] += strength
                     if kx >= x:
+                        # key is to the right
                         key_features[kx, ky][x, y, 1] += strength
                     if ky <= y:
+                        # key is up
                         key_features[kx, ky][x, y, 2] += strength
                     if ky >= y:
+                        # key is down
                         key_features[kx, ky][x, y, 3] += strength
 
         #np.set_printoptions(precision=1)
@@ -183,18 +197,7 @@ class LightScenario(object):
         return s
 
     def __str__(self):
-        printmatrix = self.walls.astype('str')
-        printmatrix[printmatrix == '1'] = '·'
-        printmatrix[printmatrix == '0'] = ' '
-        for (c, ((kx, ky), (wx, wy))) in enumerate(self.keys.items()):
-            printmatrix[kx][ky] = str(c)
-            printmatrix[wx][wy] = str(c)
-        to_print = ['init room: {} goal room: {} hint: {}\n'.format(self.init_room,self.goal_room, self.world.goal)]
-        for i in printmatrix:
-            for j in i:
-                to_print.append(j)
-            to_print.append('\n')
-        return ''.join(to_print)
+        return "\n"+self.init().pp()
 
 class LightState(object):
     def __init__(self, walls, doors, keys, pos, scenario):
@@ -205,12 +208,20 @@ class LightState(object):
         self.scenario = scenario
         self._cached_features = None
 
+    def door_open(self, door):
+        return door not in self.keys.values() 
+
     def features(self):
         if self._cached_features is None:
+            # 3 sensors in cardinal directions, to read distance to
+            # * open doors: 0-4 (LEFT, RIGHT, UP, DOWN)
+            # * closed doors: positions 4-8 (LEFT, RIGHT, UP, DOWN)
+            # * keys: positions 8-12 (LEFT, RIGHT, UP, DOWN)
+            # A door is 'open' once the key to that door is held
             out = np.zeros(12)
             for door in self.doors:
                 df = self.scenario.door_features[door][self.pos[0], self.pos[1], :]
-                if door in self.keys.values():
+                if self.door_open(door):
                     out[0:4] += df
                 else:
                     out[4:8] += df
@@ -219,8 +230,6 @@ class LightState(object):
                 out[8:12] += kf
             self._cached_features = out
         return self._cached_features
-
-        #return self.scenario.features[self.pos[0], self.pos[1], :]
 
     def position_to_room(self, x, y):
         return (int(x / ROOM_W), int(y / ROOM_H))
@@ -234,9 +243,9 @@ class LightState(object):
         x, y = self.pos
         n_keys = self.keys
         # move actions
-        if action == DOWN:
+        if action == UP:
             dx, dy = (0, -1)
-        elif action == UP:
+        elif action == DOWN:
             dx, dy = (0, 1)
         elif action == LEFT:
             dx, dy = (-1, 0)
@@ -251,15 +260,15 @@ class LightState(object):
         nx, ny = x + dx, y + dy
         if self.walls[nx, ny]:
             nx, ny = x, y
-        if (nx, ny) in self.doors and (nx, ny) in self.keys.values():
+        if not self.door_open((nx, ny)):
             nx, ny = x, y
         return 0, LightState(self.walls, self.doors, n_keys, (nx, ny), self.scenario)
 
     def pp(self):
         w, h = self.walls.shape
         out = ""
-        for x in range(w):
-            for y in range(h):
+        for y in range(h):
+            for x in range(w):
                 if (x, y) == self.pos and (x, y) in self.keys:
                     out += "%m"
                 elif (x, y) == self.pos:
@@ -273,5 +282,8 @@ class LightState(object):
                 else:
                     out += "  "
             out += "\n"
-        out += str(self.satisfies(None, None))
+        out += str(self.scenario.goal_room)
+        out += ", sat: {}".format(self.satisfies(None, None))
+        out += ", room: {}".format(self.position_to_room(self.pos[0], self.pos[1]))
+        out += ", pos: {}".format(self.pos)
         return out

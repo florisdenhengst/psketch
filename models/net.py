@@ -3,6 +3,12 @@ import tensorflow as tf
 RELU_SCALE = 1.43
 
 def mlp(t_in, widths):
+    """
+    Builds an mlp of the shape t_in:widths[0]:width[1]:....:widths[-1]
+    Returns a tuple of (last_layer, weights) where:
+    * last_layer is a reference to the network output tensors
+    * weights is a list of all weights
+    """
     weights = []
     #assert len(t_in.get_shape()) == 2
     prev_width = t_in.get_shape()[1]
