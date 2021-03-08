@@ -5,10 +5,7 @@ from .modular_ac import ModularACModel
 from .keyboard import KeyboardModel
 
 def load(config):
-    print('Loading Model')
     cls_name = config.model.name
-    print(cls_name)
-    print(globals()[cls_name])
     try:
         cls = globals()[cls_name]
         return cls(config)
