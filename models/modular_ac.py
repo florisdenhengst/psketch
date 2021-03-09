@@ -63,7 +63,7 @@ class ModularACModel(object):
         
         # number of actions in the world + 'STOP'
         self.n_actions = world.n_actions + 1
-        self.STOP = self.n_actions - 1
+        self.STOP = self.n_actions
         # number of times train() has been completed
         self.t_n_steps = tf.Variable(1., name="n_steps")
         self.t_inc_steps = self.t_n_steps.assign(self.t_n_steps + 1)
