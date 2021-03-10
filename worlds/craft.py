@@ -62,7 +62,7 @@ class CraftWorld(object):
         self.water_index = self.cookbook.index["water"]
         self.stone_index = self.cookbook.index["stone"]
 
-        self.random = np.random.RandomState(0)
+        self.random = np.random.RandomState(config.seed)
 
     def sample_scenario_with_goal(self, goal):
         assert goal not in self.cookbook.environment
@@ -190,10 +190,10 @@ class CraftState(object):
     def features(self):
         if self._cached_features is None:
             x, y = self.pos
-            hw = WINDOW_WIDTH / 2
-            hh = WINDOW_HEIGHT / 2
-            bhw = (WINDOW_WIDTH * WINDOW_WIDTH) / 2
-            bhh = (WINDOW_HEIGHT * WINDOW_HEIGHT) / 2
+            hw = int(WINDOW_WIDTH / 2)
+            hh = int(WINDOW_HEIGHT / 2)
+            bhw = int((WINDOW_WIDTH * WINDOW_WIDTH) / 2)
+            bhh = int((WINDOW_HEIGHT * WINDOW_HEIGHT) / 2)
 
             grid_feats = array.pad_slice(self.grid, (x-hw, x+hw+1), 
                     (y-hh, y+hh+1))
@@ -207,8 +207,8 @@ class CraftState(object):
             self.gfb = grid_feats_big_red.transpose((2, 0, 1))
 
             pos_feats = np.asarray(self.pos)
-            pos_feats[0] /= WIDTH
-            pos_feats[1] /= HEIGHT
+            pos_feats[0] = int(pos_feats[0] / WIDTH)
+            pos_feats[1] = int(pos_feats[1] / HEIGHT)
 
             dir_features = np.zeros(4)
             dir_features[self.dir] = 1
