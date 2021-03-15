@@ -1,4 +1,5 @@
 from .cookbook import Cookbook
+from misc import util
 
 import numpy as np
 import logging
@@ -175,12 +176,13 @@ class LightWorld(object):
         gx, gy = list(walk())[-1]
         goal_room = (init_x + gx, init_y + gy)
         return LightScenario(walls, doors, keys, door_features, key_features, 
-                init_room, goal_room, self)
+                init_room, goal_room, self.goal, self)
 
 class LightScenario(object):
     def __init__(self, walls, doors, keys, door_features, key_features, 
-            init_room, goal_room, world):
+            init_room, goal_room, hints, world):
         self.walls = walls
+        self.hints = hints
         self.doors = doors
         self.keys = keys
         self.door_features = door_features
@@ -234,6 +236,14 @@ class LightState(object):
     def position_to_room(self, x, y):
         return (int(x / ROOM_W), int(y / ROOM_H))
 
+    def boundaries_room(self, room_x, room_y):
+        "Returns ((x_min, x_max), (y_min, y_max)) bounding box for a given room"
+        x_min = room_x * ROOM_W
+        x_max = ((room_x+1) * ROOM_W)
+        y_min = room_y * ROOM_H
+        y_max = ((room_y+1) * ROOM_H)
+        return ((x_min, x_max), (y_min, y_max))
+
     def satisfies(self, goal_name, goal_arg):
         room = self.position_to_room(*self.pos)
         sat = room == self.scenario.goal_room
@@ -266,7 +276,8 @@ class LightState(object):
 
     def pp(self):
         w, h = self.walls.shape
-        out = ""
+        out = "Hints: {}\n".format(self.scenario.hints)
+        ((goal_x_min, goal_x_max), (goal_y_min, goal_y_max)) = self.boundaries_room(*self.scenario.goal_room)
         for y in range(h):
             for x in range(w):
                 if (x, y) == self.pos and (x, y) in self.keys:
@@ -276,9 +287,11 @@ class LightState(object):
                 elif self.walls[x, y]:
                     out += "##"
                 elif (x, y) in self.keys:
-                    out += "Om"
+                    out += "mm"
                 elif (x, y) in self.doors and (x, y) in self.keys.values():
                     out += "$$"
+                elif goal_x_min < x < goal_x_max and goal_y_min < y < goal_y_max:
+                    out += ".."
                 else:
                     out += "  "
             out += "\n"

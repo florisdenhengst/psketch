@@ -1,5 +1,16 @@
 import re
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 class Struct:
     def __init__(self, **entries):
         rec_entries = {}
@@ -45,6 +56,9 @@ class Index:
         if item not in self.contents:
             return None
         return self.contents[item]
+
+    def indicesof(self, value):
+        return list(self.contents.keys())[list(self.contents.values()).index(value)]
 
     def index(self, item):
         if item not in self.contents:

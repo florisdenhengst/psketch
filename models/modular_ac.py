@@ -1,5 +1,6 @@
 from misc import util
 from . import net
+from worlds import light
 
 from collections import namedtuple, defaultdict
 import logging
@@ -24,6 +25,43 @@ InputBundle = namedtuple("InputBundle", ["t_arg", "t_step", "t_feats",
         "t_action_mask", "t_reward"])
 
 ModelState = namedtuple("ModelState", ["action", "arg", "remaining", "task", "step"])
+
+
+class LightWorldDomainKnowledge():
+    def __init__(self, goals):
+        self.prev_action_label = None
+        self.prev_observation = None
+        # a sequence of symbolic high-level subgoals
+        self.goals = goals
+        self.current_goal_i = 0
+    
+    def tick(self, observation, action):
+        subgoal_met = False
+        #last_goal = self.current_goal_i == len(self.goals)
+        if self.prev_action_label != None:
+            subgoal_met = self.subgoal_met(observation)
+            if subgoal_met:
+                self.current_goal_i = min(len(self.goals), self.current_goal_i + 1)
+        self.prev_observation = observation
+        self.prev_action_label = action
+        return subgoal_met #and not last_goal
+
+    def in_door(self, observation):
+        return observation[:4].sum() == 4.0
+
+    def subgoal_met(self, observation):
+        if not self.in_door(self.prev_observation) or self.in_door(observation):
+            return False
+        elif self.goals[self.current_goal_i] == 'l' and self.prev_action_label == light.LEFT:
+            return True
+        elif self.goals[self.current_goal_i] == 'u' and self.prev_action_label == light.UP:
+            return True
+        elif self.goals[self.current_goal_i] == 'd' and self.prev_action_label == light.DOWN:
+            return True
+        elif self.goals[self.current_goal_i] == 'r' and self.prev_action_label == light.RIGHT:
+            return True
+        return False
+
 
 def increment_sparse_or_dense(into, increment):
     assert isinstance(into, np.ndarray)
@@ -147,12 +185,17 @@ class ModularACModel(object):
             for i_module in range(self.n_modules):
                 actors[i_module] = actor
         else:
+            logging.debug("Building {} actors".format(self.n_modules))
             for i_module in range(self.n_modules):
                 actor = build_actor(i_module, t_input, t_action_mask, extra_params=xp)
                 actors[i_module] = actor
 
         if self.config.model.baseline == "common":
+            logging.debug("Building single shared critic".format(self.n_tasks))
             common_critic = build_critic(0, t_input, t_reward, extra_params=xp)
+        else:
+            logging.debug("Building {} critics".format(self.n_tasks))
+
         for i_task in range(self.n_tasks):
             if self.config.model.baseline == "common":
                 critic = common_critic
@@ -195,15 +238,21 @@ class ModularACModel(object):
         self.subtasks = []
         self.args = []
         self.i_task = []
+        self.dks = []
         for i in range(n_act_batch):
             if self.config.model.use_args:
                 subtasks, args = zip(*tasks[i].steps)
+                logging.debug(subtasks)
+                logging.debug(args)
             else:
                 subtasks = tasks[i].steps
                 args = [None] * len(subtasks)
             self.subtasks.append(tuple(subtasks))
             self.args.append(tuple(args))
             self.i_task.append(self.trainer.task_index[tasks[i]])
+            steps = tasks[i].steps
+            steps = [self.trainer.subtask_index.indicesof(step)[0] for step in steps]
+            self.dks.append(LightWorldDomainKnowledge(steps))
         # list storing the subtask for each episode
         self.i_subtask = [0 for _ in range(n_act_batch)]
         self.i_step = np.zeros((n_act_batch, 1))
@@ -275,11 +324,19 @@ class ModularACModel(object):
             for pr, i in zip(probs, indices):
 
                 if self.i_step[i] >= self.config.model.max_subtask_timesteps:
-                    # Force the 'STOP' action
+                    # Force the 'STOP' action due to max subtask timesteps
                     a = self.STOP
                 else:
                     a = self.randoms[i].choice(self.n_actions, p=pr)
-
+                # TODO FdH: remove these 2 lines
+                prev_a_lab = self.dks[i].prev_action_label
+                prev_goal = self.dks[i].goals[self.dks[i].current_goal_i]
+                if self.dks[i].tick(states[i].features(), a):
+                    # Force the 'STOP' action due to subgoal
+                    #logging.debug("Force STOP: {} ({}->{}):\n{}".format(
+                    #    prev_goal,
+                    #        prev_a_lab, a, states[i].pp()))
+                    a = self.STOP
                 if a == self.STOP:
                     self.i_subtask[i] += 1
                     self.i_step[i] = 0.
