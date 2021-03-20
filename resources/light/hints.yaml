@@ -27,3 +27,37 @@
 
 "go[LUR]":
   ["left", "up", "right"]
+
+"go[URUL]":
+  ["up", "right", "up", "left"]
+
+"go[DRUR]":
+  ["down", "right", "up", "right"]
+
+"go[LLDR]":
+  ["left", "left", "down", "right"]
+
+"go[RDDL]":
+  ["right", "down", "down", "left"]
+
+"go[LURR]":
+  ["left", "up", "right", "right"]
+
+"go[DDRU]":
+  ["down", "down", "right", "up"]
+
+"go[DLUL]":
+  ["down", "left", "up", "left"]
+
+"go[DDDDD]":
+  ["down", "down", "down", "down", "down"]
+
+"go[DLUUR]":
+  ["down", "left", "up", "up", "right"]
+
+"go[URULU]":
+  ["up", "right", "up", "left", "up"]
+
+"go[RRDLD]":
+  ["right", "right", "down", "left", "down"]
+

@@ -20,4 +20,19 @@ primitives:
   - RDD
   - LUR
 
+  - URUL
+  - DRUR
+  - LLDR
+  - RDDL
+  - LURR
+
+  - DDRU
+  - DLUL
+
+  - DDDDD
+  - DLUUR
+  - URULU
+  - RRDLD
+
+
 recipes: {}

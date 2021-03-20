@@ -8,7 +8,7 @@ import logging
 import numpy as np
 import yaml
 
-N_ITERS = 3000000
+N_ITERS = 30000000
 N_UPDATE = 500
 N_BATCH = 100
 IMPROVEMENT_THRESHOLD = 0.8
@@ -197,7 +197,11 @@ class CurriculumTrainer(object):
                         i_task = self.task_index[task]
                         task_probs[i] = 1. * task_rewards[i_task] / task_counts[i_task]
                     task_probs = 1 - task_probs
-                    task_probs += 0.01
+                    if len(possible_tasks) > 5:
+                        task_probs += 0.01
+                    else:
+                        # TODO FdH: reset 0.01 probability!
+                        task_probs += 0.05
                     task_probs /= task_probs.sum()
 
             logging.info("[min reward] %s", min_reward)
