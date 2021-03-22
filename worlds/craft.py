@@ -79,7 +79,7 @@ class CraftWorld(object):
 
     def sample_scenario(self, ingredients, make_island=False, make_cave=False):
         # generate grid
-        grid = np.zeros((WIDTH, HEIGHT, self.cookbook.n_kinds))
+        grid = np.zeros((WIDTH, HEIGHT, self.cookbook.n_kinds), dtype=int)
         i_bd = self.cookbook.index["boundary"]
         grid[0, :, i_bd] = 1
         grid[WIDTH-1:, :, i_bd] = 1
@@ -109,9 +109,11 @@ class CraftWorld(object):
                 grid[x, y, primitive] = 1
 
         # generate crafting stations
+        self.workshops = {}
         for i_ws in range(N_WORKSHOPS):
             ws_x, ws_y = random_free(grid, self.random)
             grid[ws_x, ws_y, self.cookbook.index["workshop%d" % i_ws]] = 1
+            self.workshops[i_ws] = (ws_x, ws_y, i_ws, self.cookbook.index["workshop%d" % i_ws])
 
         # generate init pos
         init_pos = random_free(grid, self.random)
@@ -184,6 +186,15 @@ class CraftState(object):
         self.dir = dir
         self._cached_features = None
 
+    def at_workshop(self, workshop_id):
+        x, y = self.pos
+        here = self.grid[x, y, :]
+        workshop_thing_id = self.world.cookbook.index["workshop{}".format(workshop_id)]
+        for nx, ny in neighbors(self.pos, self.dir):
+            if self.grid[ny, nx, workshop_thing_id] > 0:
+                return True
+        return False
+
     def satisfies(self, goal_name, goal_arg):
         return self.inventory[goal_arg] > 0
 
@@ -253,12 +264,6 @@ class CraftState(object):
                 if not self.grid[nx, ny, :].any():
                     continue
 
-                if here.sum() > 1:
-                    logging.error("impossible world configuration:")
-                    logging.error(here.sum())
-                    logging.error(self.grid.sum(axis=2))
-                    logging.error(self.grid.sum(axis=0).sum(axis=0))
-                    logging.error(cookbook.index.contents)
                 assert here.sum() == 1
                 thing = here.argmax()
 
@@ -299,7 +304,6 @@ class CraftState(object):
                 elif thing == self.world.stone_index:
                     if n_inventory[cookbook.index["axe"]] > 0:
                         n_grid[nx, ny, self.world.stone_index] = 0
-
                 break
 
         # other
