@@ -66,6 +66,7 @@ class ModularACModel(object):
         
         # number of actions in the world + 'STOP'
         self.n_actions = world.n_actions + 1
+        self.n_net_actions = self.n_actions - 1
         self.STOP = self.n_actions
         # number of times train() has been completed
         self.t_n_steps = tf.Variable(1., name="n_steps")
@@ -75,7 +76,7 @@ class ModularACModel(object):
 
         def build_actor(index, t_input, t_action_mask, extra_params=[]):
             with tf.compat.v1.variable_scope("actor_%s" % index):
-                t_action_score, v_action = net.mlp(t_input, (N_HIDDEN, self.n_actions))
+                t_action_score, v_action = net.mlp(t_input, (N_HIDDEN, self.n_net_actions))
 
                 # TODO this is pretty gross
                 v_bias = v_action[-1]
@@ -124,7 +125,7 @@ class ModularACModel(object):
         t_arg = tf.compat.v1.placeholder(tf.int32, shape=(None,))
         t_step = tf.compat.v1.placeholder(tf.float32, shape=(None, 1))
         t_feats = tf.compat.v1.placeholder(tf.float32, shape=(None, self.n_features))
-        t_action_mask = tf.compat.v1.placeholder(tf.float32, shape=(None, self.n_actions))
+        t_action_mask = tf.compat.v1.placeholder(tf.float32, shape=(None, self.n_net_actions))
         t_reward = tf.compat.v1.placeholder(tf.float32, shape=(None,))
 
         if self.config.model.use_args:
@@ -216,8 +217,8 @@ class ModularACModel(object):
             self.args.append(tuple(args))
             self.i_task.append(self.trainer.task_index[tasks[i]])
             steps = tasks[i].steps
-            steps = [self.trainer.subtask_index.indicesof(step)[0] for step in steps]
-            self.dks.append(self.dk_model(steps))
+            steps = [self.trainer.subtask_index.indicesof(step) for step in steps]
+            self.dks.append(self.dk_model(steps, self.trainer.cookbook))
         # list storing the subtask for each episode
         self.i_subtask = [0 for _ in range(n_act_batch)]
         self.i_step = np.zeros((n_act_batch, 1))
@@ -243,7 +244,7 @@ class ModularACModel(object):
         for transition in episode[::-1]:
             running_reward = running_reward * DISCOUNT + transition.r
             n_transition = transition._replace(r=running_reward)
-            if n_transition.a < self.n_actions:
+            if n_transition.a < self.n_net_actions:
                 self.experiences.append(n_transition)
             else:
                 # FdH: end-state action is not appended to the experience tuple 
@@ -292,11 +293,8 @@ class ModularACModel(object):
                     # Force the 'STOP' action due to max subtask timesteps
                     a = self.STOP
                 else:
-                    a = self.randoms[i].choice(self.n_actions, p=pr)
-                # TODO FdH: remove these 2 lines
-                prev_a_lab = self.dks[i].prev_action_label
-                prev_goal = self.dks[i].goals[self.dks[i].current_goal_i]
-                if self.dks[i].tick(states[i].features(), a):
+                    a = self.randoms[i].choice(self.n_net_actions, p=pr)
+                if self.dks[i].tick(states[i], a):
                     # Force the 'STOP' action due to subgoal
                     #logging.debug("Force STOP: {} ({}->{}):\n{}".format(
                     #    prev_goal,
@@ -370,7 +368,7 @@ class ModularACModel(object):
                 args1 = [m.arg for m in m1]
                 # steps are the symbolic actions to in a task
                 steps1 = [m.step for m in m1]
-                a_mask = np.zeros((len(exps), self.n_actions))
+                a_mask = np.zeros((len(exps), self.n_net_actions))
                 for i_datum, aa in enumerate(a):
                     a_mask[i_datum, aa] = 1
 
