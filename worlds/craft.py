@@ -22,6 +22,14 @@ RIGHT = 3
 USE = 4
 N_ACTIONS = USE + 1
 
+ACTION_NAMES = {
+        DOWN: 'down',
+        UP: 'up',
+        LEFT: 'left',
+        RIGHT: 'right',
+        USE: 'use',
+        USE+1: 'STOP!'}
+
 def random_free(grid, random):
     pos = None
     while pos is None:
@@ -118,7 +126,7 @@ class CraftWorld(object):
 
         return CraftScenario(grid, init_pos, self)
 
-    def visualize(self, transitions):
+    def visualize(self, transitions, task):
         def _visualize(win):
             curses.start_color()
             for i in range(1, 8):
@@ -126,41 +134,63 @@ class CraftWorld(object):
                 curses.init_pair(i+10, curses.COLOR_BLACK, i)
             states = [transitions[0].s1] + [t.s2 for t in transitions]
             mstates = [transitions[0].m1] + [t.m2 for t in transitions]
-            for state, mstate in zip(states, mstates):
+            actions = [t.a for t in transitions]
+            for state, mstate, action in zip(states, mstates, actions):
+                sleep = .5
                 win.clear()
-                for y in range(HEIGHT):
-                    for x in range(WIDTH):
-                        if not (state.grid[x, y, :].any() or (x, y) == state.pos):
-                            continue
-                        thing = state.grid[x, y, :].argmax()
-                        if (x, y) == state.pos:
-                            if state.dir == LEFT:
-                                ch1 = "<"
-                                ch2 = "@"
-                            elif state.dir == RIGHT:
-                                ch1 = "@"
-                                ch2 = ">"
-                            elif state.dir == UP:
-                                ch1 = "^"
-                                ch2 = "@"
-                            elif state.dir == DOWN:
-                                ch1 = "@"
-                                ch2 = "v"
-                            color = curses.color_pair(mstate.arg or 0)
-                        elif thing == self.cookbook.index["boundary"]:
-                            ch1 = ch2 = curses.ACS_BOARD
-                            color = curses.color_pair(10 + thing)
-                        else:
-                            name = self.cookbook.index.get(thing)
-                            ch1 = name[0]
-                            ch2 = name[-1]
-                            color = curses.color_pair(10 + thing)
-
-                        win.addch(HEIGHT-y, x*2, ch1, color)
-                        win.addch(HEIGHT-y, x*2+1, ch2, color)
+                win.addstr("Goal: {}\n".format(self.cookbook.index.get(task.goal[1])))
+                win.addstr("Action: {}\n".format(ACTION_NAMES[action]))
+                if state is None:
+                    win.addstr("State is None\n")
+                    sleep = 1
+                else:
+                    win.addstr("\n" * (HEIGHT + 2) + "Features: {}\n".format(' '.join([str(i) for i in state.features()])))
+                    for y in range(HEIGHT):
+                        for x in range(WIDTH):
+                            if not (state.grid[x, y, :].any() or (x, y) == state.pos):
+                                continue
+                            thing = state.grid[x, y, :].argmax()
+                            if (x, y) == state.pos:
+                                if state.dir == LEFT:
+                                    ch1 = "<"
+                                elif state.dir == RIGHT:
+                                    ch1 = ">"
+                                elif state.dir == UP:
+                                    ch1 = "^"
+                                elif state.dir == DOWN:
+                                    ch1 = "v"
+                                if action == USE:
+                                    color = curses.color_pair(1)
+                                color = curses.color_pair(mstate.arg or 0)
+                            elif thing == self.cookbook.index["boundary"]:
+                                ch1 = curses.ACS_BOARD
+                                color = curses.color_pair(10 + thing)
+                            else:
+                                color = curses.color_pair(10 + thing)
+                                name = self.cookbook.index.get(thing)
+                                if name == 'iron':
+                                    ch1 = 'i'
+                                    color = curses.COLOR_WHITE
+                                elif name == 'wood':
+                                    ch1 = 'w'
+                                    color = curses.COLOR_YELLOW
+                                elif name == 'water':
+                                    ch1 = 'r'
+                                    color = curses.COLOR_BLUE
+                                elif name == 'grass':
+                                    ch1 = 'g'
+                                    color = curses.COLOR_GREEN
+                                elif name[:len('workshop')] == 'workshop':
+                                    ch1 = name[-1]
+                                    color = curses.COLOR_CYAN
+                                else:
+                                    logging.debug('no item yet {}: {}'.format(thing, name))
+                                    ch1 = ' '
+                                    color = curses.color_pair(0)
+                            win.addch(HEIGHT-y + 2, x, ch1, color)
                 win.refresh()
-                time.sleep(1)
-        curses.wrapper(_visualize)
+                time.sleep(sleep)
+#        curses.wrapper(_visualize)
 
 class CraftScenario(object):
     def __init__(self, grid, init_pos, world):

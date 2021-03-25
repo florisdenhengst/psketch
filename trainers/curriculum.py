@@ -50,6 +50,7 @@ class CurriculumTrainer(object):
                     self.tasks_by_subtask[subtask].append(task)
             self.tasks.append(task)
             self.task_index.index(task)
+        logging.debug("COOKBOOK {}".format(self.cookbook.index))
 
     def do_rollout(self, model, world, possible_tasks, task_probs):
         states_before = []
@@ -108,7 +109,7 @@ class CurriculumTrainer(object):
             states_before = states_after
             timer -= 1
 
-        return transitions, total_reward / N_BATCH
+        return transitions, total_reward / N_BATCH, tasks
 
     def train(self, model, world):
         model.prepare(world, self)
@@ -154,7 +155,7 @@ class CurriculumTrainer(object):
                     while err is None:
                         i_iter += N_BATCH
                         # list of episodes (list of transitions) and avg reward?
-                        episodes, reward = self.do_rollout(model, world, 
+                        episodes, reward, tasks = self.do_rollout(model, world, 
                                 possible_tasks, task_probs) # produces N_BATCH = 100 episodes
                         for e in episodes:
                             tr = sum(tt.r for tt in e)
@@ -168,6 +169,7 @@ class CurriculumTrainer(object):
                         err = model.train()
                         errs.append(err)
                     total_err += err
+#                    world.visualize(episodes[0], tasks[0])
 
                 # log
                 logging.info("[step] %d", i_iter)
