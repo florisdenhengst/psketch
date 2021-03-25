@@ -58,8 +58,7 @@ class CraftWorld(object):
         self.n_features = \
                 2 * WINDOW_WIDTH * WINDOW_HEIGHT * self.cookbook.n_kinds + \
                 self.cookbook.n_kinds + \
-                4 + \
-                1
+                4
         self.n_actions = N_ACTIONS
 
         self.non_grabbable_indices = self.cookbook.environment
@@ -87,7 +86,7 @@ class CraftWorld(object):
 
     def sample_scenario(self, ingredients, make_island=False, make_cave=False):
         # generate grid
-        grid = np.zeros((WIDTH, HEIGHT, self.cookbook.n_kinds))
+        grid = np.zeros((WIDTH, HEIGHT, self.cookbook.n_kinds), dtype=int)
         i_bd = self.cookbook.index["boundary"]
         grid[0, :, i_bd] = 1
         grid[WIDTH-1:, :, i_bd] = 1
@@ -200,7 +199,7 @@ class CraftScenario(object):
         self.world = world
 
     def init(self):
-        inventory = np.zeros(self.world.cookbook.n_kinds)
+        inventory = np.zeros(self.world.cookbook.n_kinds, dtype=int)
         state = CraftState(self, self.init_grid, self.init_pos, self.init_dir, inventory)
         return state
 
@@ -240,12 +239,12 @@ class CraftState(object):
             pos_feats[0] = int(pos_feats[0] / WIDTH)
             pos_feats[1] = int(pos_feats[1] / HEIGHT)
 
-            dir_features = np.zeros(4)
+            dir_features = np.zeros(4, dtype=int)
             dir_features[self.dir] = 1
 
             features = np.concatenate((grid_feats.ravel(),
                     grid_feats_big_red.ravel(), self.inventory, 
-                    dir_features, [0]))
+                    dir_features))
             assert len(features) == self.world.n_features
             self._cached_features = features
 
