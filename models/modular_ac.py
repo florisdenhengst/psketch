@@ -64,6 +64,7 @@ class ModularACModel(object):
         # number of actions in the world + 'STOP'
         self.n_actions = world.n_actions + 1
         self.STOP = world.n_actions
+        self.FORCE_STOP = self.n_actions
         # number of times train() has been completed
         self.t_n_steps = tf.Variable(1., name="n_steps")
         self.t_inc_steps = self.t_n_steps.assign(self.t_n_steps + 1)
@@ -229,11 +230,12 @@ class ModularACModel(object):
         for transition in episode[::-1]:
             running_reward = running_reward * DISCOUNT + transition.r
             n_transition = transition._replace(r=running_reward)
-            if n_transition.a < self.n_actions:
+            if n_transition.a <= self.STOP:
                 self.experiences.append(n_transition)
+            elif n_transition.a == self.FORCE_STOP:
+                pass
             else:
-                # FdH: end-state action is not appended to the experience tuple 
-                raise ValueError("Unknown action '{}'".format(n_transition.a))
+                raise ValueError('Unknown action {}'.format(n_transition.a))
 
 
     def featurize(self, state, mstate):
@@ -276,15 +278,13 @@ class ModularACModel(object):
 
                 if self.i_step[i] >= self.config.model.max_subtask_timesteps:
                     # Force the 'STOP' action
-                    a = self.STOP
+                    a = self.FORCE_STOP
                 else:
                     a = self.randoms[i].choice(self.n_actions, p=pr)
 
-                if a == self.STOP:
+                if a == self.STOP or a == self.FORCE_STOP:
                     self.i_subtask[i] += 1
                     self.i_step[i] = 0.
-                elif a > self.n_actions - 1:
-                    raise ValueError('Action with index "{}" not available in {}+{}={}'.format(self.world.n_actions, 1, self.n_actions))
                 t = self.i_subtask[i] >= len(self.subtasks[indices[0]])
                 action[i] = a
                 terminate[i] = t
