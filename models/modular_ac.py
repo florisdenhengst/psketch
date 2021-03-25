@@ -231,11 +231,9 @@ class ModularACModel(object):
             running_reward = running_reward * DISCOUNT + transition.r
             n_transition = transition._replace(r=running_reward)
             if n_transition.a <= self.STOP:
-                if n_transition.a == self.STOP:
-                    logging.debug('learning STOP')
                 self.experiences.append(n_transition)
             elif n_transition.a == self.FORCE_STOP:
-                logging.debug('skipping FORCED STOP')
+                pass
             else:
                 raise ValueError('Unknown action {}'.format(n_transition.a))
 
