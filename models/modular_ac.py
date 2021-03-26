@@ -24,7 +24,7 @@ Trainer = namedtuple("Trainer", ["t_loss", "t_grad", "t_train_op"])
 InputBundle = namedtuple("InputBundle", ["t_arg", "t_step", "t_feats", 
         "t_action_mask", "t_reward"])
 
-ModelState = namedtuple("ModelState", ["action", "arg", "remaining", "task", "step"])
+ModelState = namedtuple("ModelState", ["action", "arg", "remaining", "task", "step", "at_subtask"])
 
 
 def increment_sparse_or_dense(into, increment):
@@ -67,7 +67,8 @@ class ModularACModel(object):
         # number of actions in the world + 'STOP'
         self.n_actions = world.n_actions + 1
         self.n_net_actions = self.n_actions - 1
-        self.STOP = self.n_actions
+        self.STOP = world.n_actions
+        self.FORCE_STOP = self.n_actions
         # number of times train() has been completed
         self.t_n_steps = tf.Variable(1., name="n_steps")
         self.t_inc_steps = self.t_n_steps.assign(self.t_n_steps + 1)
@@ -244,11 +245,12 @@ class ModularACModel(object):
         for transition in episode[::-1]:
             running_reward = running_reward * DISCOUNT + transition.r
             n_transition = transition._replace(r=running_reward)
-            if n_transition.a < self.n_net_actions:
+            if n_transition.a < self.STOP:
                 self.experiences.append(n_transition)
-            else:
-                # FdH: end-state action is not appended to the experience tuple 
+            elif n_transition.a == self.FORCE_STOP:
                 pass
+            else:
+                raise ValueError('Unknown action {}'.format(n_transition.a))
 
 
     def featurize(self, state, mstate):
@@ -290,8 +292,8 @@ class ModularACModel(object):
             for pr, i in zip(probs, indices):
 
                 if self.i_step[i] >= self.config.model.max_subtask_timesteps:
-                    # Force the 'STOP' action due to max subtask timesteps
-                    a = self.STOP
+                    # Force the 'STOP' action
+                    a = self.FORCE_STOP
                 else:
                     a = self.randoms[i].choice(self.n_net_actions, p=pr)
                 if self.dks[i].tick(states[i], a):
@@ -299,12 +301,10 @@ class ModularACModel(object):
                     #logging.debug("Force STOP: {} ({}->{}):\n{}".format(
                     #    prev_goal,
                     #        prev_a_lab, a, states[i].pp()))
-                    a = self.STOP
-                if a == self.STOP:
+                    a = self.FORCE_STOP
+                if a == self.STOP or a == self.FORCE_STOP:
                     self.i_subtask[i] += 1
                     self.i_step[i] = 0.
-                elif a > self.n_actions - 1:
-                    raise ValueError('Action with index "{}" not available in {}+{}={}'.format(self.world.n_actions, 1, self.n_actions))
                 t = self.i_subtask[i] >= len(self.subtasks[indices[0]])
                 action[i] = a
                 terminate[i] = t
@@ -314,14 +314,15 @@ class ModularACModel(object):
         out = []
         for i in range(len(self.i_subtask)):
             if self.i_subtask[i] >= len(self.subtasks[i]):
-                out.append(ModelState(None, None, None, None, [0.]))
+                out.append(ModelState(None, None, None, None, [0.], None))
             else:
                 out.append(ModelState(
                         self.subtasks[i][self.i_subtask[i]], 
                         self.args[i][self.i_subtask[i]], 
                         len(self.args) - self.i_subtask[i],
                         self.i_task[i],
-                        self.i_step[i].copy()))
+                        self.i_step[i].copy(),
+                        self.i_subtask[i]))
         return out
 
     def train(self, action=None, update_actor=True, update_critic=True):

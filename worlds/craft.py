@@ -22,6 +22,15 @@ RIGHT = 3
 USE = 4
 N_ACTIONS = USE + 1
 
+ACTION_NAMES = {
+        DOWN: 'down',
+        UP: 'up',
+        LEFT: 'left',
+        RIGHT: 'right',
+        USE: 'use',
+        USE+1: 'STOP!',
+        USE+2: 'forced STOP!',}
+
 def random_free(grid, random):
     pos = None
     while pos is None:
@@ -50,8 +59,7 @@ class CraftWorld(object):
         self.n_features = \
                 2 * WINDOW_WIDTH * WINDOW_HEIGHT * self.cookbook.n_kinds + \
                 self.cookbook.n_kinds + \
-                4 + \
-                1
+                4
         self.n_actions = N_ACTIONS
 
         self.non_grabbable_indices = self.cookbook.environment
@@ -120,7 +128,7 @@ class CraftWorld(object):
 
         return CraftScenario(grid, init_pos, self)
 
-    def visualize(self, transitions):
+    def visualize(self, transitions, task):
         def _visualize(win):
             curses.start_color()
             for i in range(1, 8):
@@ -128,40 +136,20 @@ class CraftWorld(object):
                 curses.init_pair(i+10, curses.COLOR_BLACK, i)
             states = [transitions[0].s1] + [t.s2 for t in transitions]
             mstates = [transitions[0].m1] + [t.m2 for t in transitions]
-            for state, mstate in zip(states, mstates):
+            actions = [t.a for t in transitions]
+            for state, mstate, action in zip(states, mstates, actions):
+                sleep = .5
                 win.clear()
-                for y in range(HEIGHT):
-                    for x in range(WIDTH):
-                        if not (state.grid[x, y, :].any() or (x, y) == state.pos):
-                            continue
-                        thing = state.grid[x, y, :].argmax()
-                        if (x, y) == state.pos:
-                            if state.dir == LEFT:
-                                ch1 = "<"
-                                ch2 = "@"
-                            elif state.dir == RIGHT:
-                                ch1 = "@"
-                                ch2 = ">"
-                            elif state.dir == UP:
-                                ch1 = "^"
-                                ch2 = "@"
-                            elif state.dir == DOWN:
-                                ch1 = "@"
-                                ch2 = "v"
-                            color = curses.color_pair(mstate.arg or 0)
-                        elif thing == self.cookbook.index["boundary"]:
-                            ch1 = ch2 = curses.ACS_BOARD
-                            color = curses.color_pair(10 + thing)
-                        else:
-                            name = self.cookbook.index.get(thing)
-                            ch1 = name[0]
-                            ch2 = name[-1]
-                            color = curses.color_pair(10 + thing)
-
-                        win.addch(HEIGHT-y, x*2, ch1, color)
-                        win.addch(HEIGHT-y, x*2+1, ch2, color)
+                win.addstr("Goal: {}\n".format(self.cookbook.index.get(task.goal[1])))
+                win.addstr("Action: {}\n".format(ACTION_NAMES[action]))
+                win.addstr("Subtask i: {}\n".format(mstate.at_subtask))
+                if state is None:
+                    win.addstr("State is None\n")
+                    sleep = 1
+                else:
+                    state.visualize(win, self.cookbook, action)
                 win.refresh()
-                time.sleep(1)
+                time.sleep(sleep)
         curses.wrapper(_visualize)
 
 class CraftScenario(object):
@@ -172,7 +160,7 @@ class CraftScenario(object):
         self.world = world
 
     def init(self):
-        inventory = np.zeros(self.world.cookbook.n_kinds)
+        inventory = np.zeros(self.world.cookbook.n_kinds, dtype=int)
         state = CraftState(self, self.init_grid, self.init_pos, self.init_dir, inventory)
         return state
 
@@ -185,6 +173,55 @@ class CraftState(object):
         self.pos = pos
         self.dir = dir
         self._cached_features = None
+
+    def visualize(self, win, cookbook, action=None):
+        try:
+           win.addstr("\n" * (HEIGHT + 2) + "Features: {}\n".format(' '.join([str(i) for i in self.features()])))
+        except curses.error:
+            pass
+        for y in range(HEIGHT):
+            for x in range(WIDTH):
+                if not (self.grid[x, y, :].any() or (x, y) == self.pos):
+                    continue
+                thing = self.grid[x, y, :].argmax()
+                if (x, y) == self.pos:
+                    if self.dir == LEFT:
+                        ch1 = "<"
+                    elif self.dir == RIGHT:
+                        ch1 = ">"
+                    elif self.dir == UP:
+                        ch1 = "^"
+                    elif self.dir == DOWN:
+                        ch1 = "v"
+                    if action == USE:
+                        color = curses.color_pair(1)
+                    color = curses.color_pair(0)
+                elif thing == cookbook.index["boundary"]:
+                    ch1 = curses.ACS_BOARD
+                    color = curses.color_pair(10 + thing)
+                else:
+                    color = curses.color_pair(10 + thing)
+                    name = cookbook.index.get(thing)
+                    if name == 'iron':
+                        ch1 = 'i'
+                        color = curses.COLOR_WHITE
+                    elif name == 'wood':
+                        ch1 = 'w'
+                        color = curses.COLOR_YELLOW
+                    elif name == 'water':
+                        ch1 = 'r'
+                        color = curses.COLOR_BLUE
+                    elif name == 'grass':
+                        ch1 = 'g'
+                        color = curses.COLOR_GREEN
+                    elif name[:len('workshop')] == 'workshop':
+                        ch1 = name[-1]
+                        color = curses.COLOR_CYAN
+                    else:
+                        logging.debug('no item yet {}: {}'.format(thing, name))
+                        ch1 = ' '
+                        color = curses.color_pair(0)
+                win.addch(HEIGHT-y + 2, x, ch1, color)
 
     def at_workshop(self, workshop_id):
         x, y = self.pos
@@ -221,12 +258,12 @@ class CraftState(object):
             pos_feats[0] = int(pos_feats[0] / WIDTH)
             pos_feats[1] = int(pos_feats[1] / HEIGHT)
 
-            dir_features = np.zeros(4)
+            dir_features = np.zeros(4, dtype=int)
             dir_features[self.dir] = 1
 
             features = np.concatenate((grid_feats.ravel(),
                     grid_feats_big_red.ravel(), self.inventory, 
-                    dir_features, [0]))
+                    dir_features))
             assert len(features) == self.world.n_features
             self._cached_features = features
 

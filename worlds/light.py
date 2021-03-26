@@ -274,6 +274,9 @@ class LightState(object):
             nx, ny = x, y
         return 0, LightState(self.walls, self.doors, n_keys, (nx, ny), self.scenario)
 
+    def visualize(self, *args, **kwargs):
+        return self.pp()
+
     def pp(self):
         w, h = self.walls.shape
         out = "Hints: {}\n".format(self.scenario.hints)
