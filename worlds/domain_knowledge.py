@@ -64,7 +64,7 @@ class CraftWorldDomainKnowledge():
 
     def subgoal_met(self, state, action):
         subgoal = self.goals[self.current_goal_i]
-        if subgoal == 'get_grass':
+        if subgoal == 'get_wood':
             return self.check_inventory(state, 'wood')
         if subgoal == 'get_grass':
             return self.check_inventory(state, 'grass')
@@ -77,8 +77,9 @@ class CraftWorldDomainKnowledge():
         if subgoal == 'get_gem':
             return self.check_inventory(state, 'gem')
         if subgoal[:4] == 'make':
-            logging.debug("subgoal make: {}".format(subgoal))
             return state.at_workshop(subgoal[-1]) and self.prev_action_label == craft.USE
+        else:
+            raise ValueError("Subgoal not known: {}".format(subgoal))
         return False
 
 def domain_model(config):
