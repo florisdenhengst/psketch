@@ -77,7 +77,7 @@ class CraftWorldDomainKnowledge():
         if subgoal == 'get_gem':
             return self.check_inventory(state, 'gem')
         if subgoal[:4] == 'make':
-            return state.at_workshop(subgoal[-1]) and self.prev_action_label == craft.USE
+            return self.prev_state.at_workshop(subgoal[-1]) and self.prev_action_label == craft.USE
         else:
             raise ValueError("Subgoal not known: {}".format(subgoal))
         return False
