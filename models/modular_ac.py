@@ -1,4 +1,5 @@
 from misc import util
+from misc import ringbuffer
 from . import net
 from worlds import domain_knowledge
 
@@ -37,7 +38,7 @@ def increment_sparse_or_dense(into, increment):
 
 class ModularACModel(object):
     def __init__(self, config):
-        self.experiences = []
+        self.experiences = ringbuffer.RingBuffer(N_UPDATE)
         self.world = None
         self.next_actor_seed = config.seed
         self.config = config
@@ -332,9 +333,11 @@ class ModularACModel(object):
             experiences = [e for e in self.experiences if e.m1.action == action]
         if len(experiences) < N_UPDATE: # 2000
             return None
+        
         # Select first experience tuples from batch (experience = s,a,r,s')
         # Note FdH: should be randomly sampling? (experiences are cleared, so only new exps
-        batch = experiences[:N_UPDATE]
+        # Note FdH: only select most recent N_UPDATE experiences
+        batch = experiences[-N_UPDATE:]
 
         # mapping modules, i.e. (task, symbolic action) tuples, to list of episodes
         by_mod = defaultdict(list)
@@ -421,7 +424,7 @@ class ModularACModel(object):
         self.session.run(self.t_update_gradient_op, feed_dict=feed_dict)
 
         # Clear experiences
-        self.experiences = []
+        #self.experiences = []
         self.session.run(self.t_inc_steps)
 
         return np.asarray([total_actor_err, total_critic_err]) / N_UPDATE
