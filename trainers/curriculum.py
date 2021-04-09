@@ -142,7 +142,7 @@ class CurriculumTrainer(object):
                     task_probs = np.ones(len(possible_tasks)) / len(possible_tasks)
 
                 total_reward = 0. # FdH: total avg reward
-                total_err = None
+                total_err = 0.
                 total_reward_episodes = 0.
                 errs = []
                 count = 0.
@@ -150,29 +150,24 @@ class CurriculumTrainer(object):
                 task_counts = defaultdict(lambda: 0)
                 for j in range(N_UPDATE): # FdH: N_UPDATE=500
                     err = None
-                    cont = True
                     # get enough samples for one training step
-                    i_iter += N_BATCH
-                    # list of episodes (list of transitions) and avg reward?
-                    episodes, reward = self.do_rollout(model, world, 
-                            possible_tasks, task_probs) # produces N_BATCH = 100 episodes
-                    for e in episodes:
-                        tr = sum(tt.r for tt in e)
-                        task_rewards[e[0].m1.task] += tr
-                        task_counts[e[0].m1.task] += 1
-                        total_reward_episodes += tr
-                    total_reward += reward
-                    count += 1
-                    for e in episodes:
-                        model.experience(e)
-                    err = model.train()
-                    errs.append(err)
-                    if err is not None:
-                        if total_err is None:
-                            total_err = err
-                        else:
-                            total_err += err
-#                    world.visualize(episodes[0], tasks[0])
+                    while err is None:
+                        i_iter += N_BATCH
+                        # list of episodes (list of transitions) and avg reward?
+                        episodes, reward = self.do_rollout(model, world, 
+                                possible_tasks, task_probs) # produces N_BATCH = 100 episodes
+                        for e in episodes:
+                            tr = sum(tt.r for tt in e)
+                            task_rewards[e[0].m1.task] += tr
+                            task_counts[e[0].m1.task] += 1
+                            total_reward_episodes += tr
+                        total_reward += reward
+                        count += 1
+                        for e in episodes:
+                            model.experience(e)
+                        err = model.train()
+                        errs.append(err)
+                    total_err += err
 
                 # log
                 logging.info("[step] %d", i_iter)
