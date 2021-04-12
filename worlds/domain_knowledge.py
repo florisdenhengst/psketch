@@ -27,15 +27,15 @@ class LightWorldDomainKnowledge():
         return observation[:4].sum() == 4.0
 
     def subgoal_met(self, observation):
-        if not self.in_door(self.prev_observation) or self.in_door(observation):
+        if not self.in_door(self.prev_observation):
             return False
-        elif self.goals[self.current_goal_i] == 'left' and self.prev_action_label == light.LEFT:
+        elif self.goals[self.current_goal_i] == 'left':
             return True
-        elif self.goals[self.current_goal_i] == 'up' and self.prev_action_label == light.UP:
+        elif self.goals[self.current_goal_i] == 'up':
             return True
-        elif self.goals[self.current_goal_i] == 'down' and self.prev_action_label == light.DOWN:
+        elif self.goals[self.current_goal_i] == 'down':
             return True
-        elif self.goals[self.current_goal_i] == 'right' and self.prev_action_label == light.RIGHT:
+        elif self.goals[self.current_goal_i] == 'right':
             return True
         return False
 
