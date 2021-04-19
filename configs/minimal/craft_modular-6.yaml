@@ -1,5 +1,5 @@
 name: craft_modular-minimal-6
-recipes: "resources/craft/recipes-minimal.yaml"
+recipes: "resources/craft/recipes.yaml"
 seed: 6
 world: 
   name: CraftWorld 

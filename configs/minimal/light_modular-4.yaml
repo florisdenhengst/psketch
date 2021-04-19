@@ -1,5 +1,5 @@
 name: light_modular-minimal-4
-recipes: "resources/light/recipes-minimal.yaml"
+recipes: "resources/light/recipes.yaml"
 seed: 4
 world: 
   name: LightWorld 
