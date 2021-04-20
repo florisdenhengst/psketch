@@ -1,4 +1,4 @@
-name: craft_modular-minimal-5
+name: craft_modular-minimal_forcestop-5
 recipes: "resources/craft/recipes.yaml"
 seed: 5
 world: 

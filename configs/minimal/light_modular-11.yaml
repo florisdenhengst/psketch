@@ -1,4 +1,4 @@
-name: light_modular-minimal-11
+name: light_modular-minimal_forcestop-11
 recipes: "resources/light/recipes.yaml"
 seed: 11
 world: 
