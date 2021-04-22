@@ -80,9 +80,10 @@ class ModularACModel(object):
                 t_action_score, v_action = net.mlp(t_input, (N_HIDDEN, self.n_net_actions))
 
                 # TODO this is pretty gross
+                # NOTE FdH: this hardcodes a bias against the last action, STOP in the original work
                 v_bias = v_action[-1]
                 assert "b1" in v_bias.name
-                t_decrement_op = v_bias[-1].assign(v_bias[-1] - 3)
+                t_decrement_op = v_bias[-1].assign(v_bias[-1] - 0)
 
                 t_action_logprobs = tf.nn.log_softmax(t_action_score)
                 t_chosen_prob = tf.math.reduce_sum(t_action_mask * t_action_logprobs, 
