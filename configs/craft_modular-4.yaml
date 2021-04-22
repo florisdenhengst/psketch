@@ -1,4 +1,4 @@
-name: craft_modular-4
+name: craft_modular-4-forcestop
 recipes: "resources/craft/recipes.yaml"
 seed: 4
 world: 

@@ -1,6 +1,6 @@
-name: light_modular-3
+name: light_modular-3-forcestop
 recipes: "resources/light/recipes.yaml"
-seed: 3
+seed: 13
 world: 
   name: LightWorld 
 model: 

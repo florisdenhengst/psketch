@@ -1,4 +1,4 @@
-name: light_modular-2
+name: light_modular-2-forcestop
 recipes: "resources/light/recipes.yaml"
 seed: 2
 world: 
