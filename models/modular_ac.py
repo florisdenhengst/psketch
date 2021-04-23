@@ -69,6 +69,7 @@ class ModularACModel(object):
         self.n_net_actions = self.n_actions - 1
         self.STOP = world.n_actions
         self.FORCE_STOP = self.n_actions + 1
+        self.SHAPING_REWARD = .1
         # number of times train() has been completed
         self.t_n_steps = tf.Variable(1., name="n_steps")
         self.t_inc_steps = self.t_n_steps.assign(self.t_n_steps + 1)
@@ -243,16 +244,24 @@ class ModularACModel(object):
 
     def experience(self, episode):
         running_reward = 0
+        shaped_running_reward = 0
+        shaping_r = 0
         for transition in episode[::-1]:
+            if transition.a == self.STOP:
+                shaping_r = self.SHAPING_REWARD
+            else:
+                shaping_r = 0
             running_reward = running_reward * DISCOUNT + transition.r
-            n_transition = transition._replace(r=running_reward)
+            shaped_running_reward = shaped_running_reward * DISCOUNT + shaping_r
+            n_transition = transition._replace(r=running_reward + shaped_running_reward)
             if n_transition.a < self.STOP:
                 self.experiences.append(n_transition)
             elif n_transition.a == self.FORCE_STOP:
+                # STOP due to too many timesteps
+                shaped_running_reward = 0
                 pass
             elif n_transition.a != self.STOP:
                 raise ValueError('Unknown action {}'.format(n_transition.a))
-
 
     def featurize(self, state, mstate):
         if self.config.model.featurize_plan:
