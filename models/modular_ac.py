@@ -68,7 +68,7 @@ class ModularACModel(object):
         self.n_actions = world.n_actions + 1
         self.n_net_actions = self.n_actions - 1
         self.STOP = world.n_actions
-        self.FORCE_STOP = self.n_actions
+        self.FORCE_STOP = self.n_actions + 1
         # number of times train() has been completed
         self.t_n_steps = tf.Variable(1., name="n_steps")
         self.t_inc_steps = self.t_n_steps.assign(self.t_n_steps + 1)
@@ -250,7 +250,7 @@ class ModularACModel(object):
                 self.experiences.append(n_transition)
             elif n_transition.a == self.FORCE_STOP:
                 pass
-            else:
+            elif n_transition.a != self.STOP:
                 raise ValueError('Unknown action {}'.format(n_transition.a))
 
 
@@ -302,8 +302,9 @@ class ModularACModel(object):
                     #logging.debug("Force STOP: {} ({}->{}):\n{}".format(
                     #    prev_goal,
                     #        prev_a_lab, a, states[i].pp()))
-                    a = self.FORCE_STOP
+                    a = self.STOP
                 if a == self.STOP or a == self.FORCE_STOP:
+                    self.dks[i].advance()
                     self.i_subtask[i] += 1
                     self.i_step[i] = 0.
                 t = self.i_subtask[i] >= len(self.subtasks[indices[0]])
@@ -337,7 +338,12 @@ class ModularACModel(object):
         # Note FdH: should be randomly sampling? (experiences are cleared, so only new exps
         batch = experiences[:N_UPDATE]
 
-        # mapping modules, i.e. (task, symbolic action) tuples, to list of episodes
+        # mapping modules, i.e. (task, symbolic action) tuples, to list of tuples
+        #  * s1: feature representation of state s
+        #  * m1: ModelState in s
+        #  *  a: selected action (index)
+        #  * s2: feature representation of state s'
+        #  * m2: ModelState in s'
         by_mod = defaultdict(list)
         for e in batch:
             by_mod[e.m1.task, e.m1.action].append(e)
