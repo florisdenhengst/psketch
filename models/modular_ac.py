@@ -260,7 +260,7 @@ class ModularACModel(object):
                 # STOP due to too many timesteps
                 shaped_running_reward = 0
                 pass
-            elif n_transition.a != self.STOP:
+            else:
                 raise ValueError('Unknown action {}'.format(n_transition.a))
 
     def featurize(self, state, mstate):
@@ -311,9 +311,8 @@ class ModularACModel(object):
                     #logging.debug("Force STOP: {} ({}->{}):\n{}".format(
                     #    prev_goal,
                     #        prev_a_lab, a, states[i].pp()))
-                    a = self.STOP
+                    a = self.FORCE_STOP
                 if a == self.STOP or a == self.FORCE_STOP:
-                    self.dks[i].advance()
                     self.i_subtask[i] += 1
                     self.i_step[i] = 0.
                 t = self.i_subtask[i] >= len(self.subtasks[indices[0]])
@@ -347,12 +346,7 @@ class ModularACModel(object):
         # Note FdH: should be randomly sampling? (experiences are cleared, so only new exps
         batch = experiences[:N_UPDATE]
 
-        # mapping modules, i.e. (task, symbolic action) tuples, to list of tuples
-        #  * s1: feature representation of state s
-        #  * m1: ModelState in s
-        #  *  a: selected action (index)
-        #  * s2: feature representation of state s'
-        #  * m2: ModelState in s'
+        # mapping modules, i.e. (task, symbolic action) tuples, to list of episodes
         by_mod = defaultdict(list)
         for e in batch:
             by_mod[e.m1.task, e.m1.action].append(e)
