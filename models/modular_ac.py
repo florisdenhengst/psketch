@@ -42,6 +42,7 @@ class ModularACModel(object):
         self.next_actor_seed = config.seed
         self.config = config
         self.dk_model = domain_knowledge.domain_model(config)
+        self.shaping_reward = self.config.model.shaping_reward
 
     def prepare(self, world, trainer):
         """
@@ -69,7 +70,6 @@ class ModularACModel(object):
         self.n_net_actions = self.n_actions - 1
         self.STOP = world.n_actions
         self.FORCE_STOP = self.n_actions + 1
-        self.SHAPING_REWARD = .1
         # number of times train() has been completed
         self.t_n_steps = tf.Variable(1., name="n_steps")
         self.t_inc_steps = self.t_n_steps.assign(self.t_n_steps + 1)
@@ -248,7 +248,7 @@ class ModularACModel(object):
         shaping_r = 0
         for transition in episode[::-1]:
             if transition.a == self.STOP:
-                shaping_r = self.SHAPING_REWARD
+                shaping_r = self.shaping_reward
             else:
                 shaping_r = 0
             running_reward = running_reward * DISCOUNT + transition.r
