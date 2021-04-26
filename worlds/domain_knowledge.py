@@ -10,9 +10,6 @@ class LightWorldDomainKnowledge():
         # a sequence of symbolic high-level subgoals
         self.goals = goals
         self.current_goal_i = 0
-
-    def advance(self):
-        self.current_goal_i = min(len(self.goals) - 1, self.current_goal_i + 1)
     
     def tick(self, state, action):
         observation = state.features()
@@ -21,7 +18,7 @@ class LightWorldDomainKnowledge():
         if self.prev_action_label != None:
             subgoal_met = self.subgoal_met(observation)
             if subgoal_met:
-                self.advance()
+                self.current_goal_i = min(len(self.goals) - 1, self.current_goal_i + 1)
         self.prev_observation = observation
         self.prev_action_label = action
         return subgoal_met #and not last_goal
@@ -51,14 +48,11 @@ class CraftWorldDomainKnowledge():
         self.current_goal_i = 0
         self.cookbook = cookbook
 
-    def advance(self):
-        self.current_goal_i = min(len(self.goals) - 1, self.current_goal_i + 1)
-
     def tick(self, state, action):
         subgoal_met = self.subgoal_met(state, action)
         #last_goal = self.current_goal_i == len(self.goals)
         if subgoal_met:
-            self.advance()
+            self.current_goal_i = min(len(self.goals), self.current_goal_i + 1)
         self.prev_state = state
         self.prev_action_label = action
         return subgoal_met #and not last_goal
