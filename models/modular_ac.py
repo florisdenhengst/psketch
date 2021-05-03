@@ -253,9 +253,6 @@ class ModularACModel(object):
                 shaping_r = 0
             running_reward = running_reward * DISCOUNT + transition.r
             shaped_running_reward = shaped_running_reward * DISCOUNT + shaping_r
-                running_reward, rr_old, DISCOUNT, transition.r,
-                shaped_running_reward, srr_old, DISCOUNT, shaping_r,
-                ))
             n_transition = transition._replace(r=running_reward + shaped_running_reward)
             if n_transition.a < self.STOP:
                 self.experiences.append(n_transition)
