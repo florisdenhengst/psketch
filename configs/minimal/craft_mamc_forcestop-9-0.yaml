@@ -3,7 +3,7 @@ model:
   featurize_plan: false
   max_subtask_timesteps: 15
   name: ModularActorModularCriticModel
-  reward_shaping: 0
+  shaping_reward: 0
   use_args: false
 name: craft_mamc-minimal_forcestop-9
 recipes: resources/craft/recipes.yaml
