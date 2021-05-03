@@ -253,6 +253,9 @@ class ModularACModel(object):
                 shaping_r = 0
             running_reward = running_reward * DISCOUNT + transition.r
             shaped_running_reward = shaped_running_reward * DISCOUNT + shaping_r
+                running_reward, rr_old, DISCOUNT, transition.r,
+                shaped_running_reward, srr_old, DISCOUNT, shaping_r,
+                ))
             n_transition = transition._replace(r=running_reward + shaped_running_reward)
             if n_transition.a < self.STOP:
                 self.experiences.append(n_transition)
@@ -260,7 +263,7 @@ class ModularACModel(object):
                 # STOP due to too many timesteps
                 shaped_running_reward = 0
                 pass
-            else:
+            elif n_transition.a != self.STOP:
                 raise ValueError('Unknown action {}'.format(n_transition.a))
 
     def featurize(self, state, mstate):
@@ -311,7 +314,7 @@ class ModularACModel(object):
                     #logging.debug("Force STOP: {} ({}->{}):\n{}".format(
                     #    prev_goal,
                     #        prev_a_lab, a, states[i].pp()))
-                    a = self.FORCE_STOP
+                    a = self.STOP
                 if a == self.STOP or a == self.FORCE_STOP:
                     self.i_subtask[i] += 1
                     self.i_step[i] = 0.
@@ -365,7 +368,7 @@ class ModularACModel(object):
         # this loop determines the gradients for both critic and actor networks
         for i_task, i_mod1 in sorted(by_mod):
             actor = self.actors[i_mod1] # actor for this symbolic action
-            critic = self.critics[i_task, i_mod1] # critic for this task + symbolic action?
+            critic = self.critics[i_task, i_mod1] # critic for this task + symbolic action
             actor_trainer = self.actor_trainers[i_task, i_mod1]
             critic_trainer = self.critic_trainers[i_task, i_mod1]
 
