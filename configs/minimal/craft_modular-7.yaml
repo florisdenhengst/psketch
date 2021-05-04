@@ -9,6 +9,7 @@ model:
   featurize_plan: false
   max_subtask_timesteps: 15
   baseline: state
+  shaping_reward: 0
 trainer: 
   name: CurriculumTrainer
   use_curriculum: true
