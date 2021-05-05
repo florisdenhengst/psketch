@@ -52,7 +52,7 @@ class CraftWorldDomainKnowledge():
         subgoal_met = self.subgoal_met(state, action)
         #last_goal = self.current_goal_i == len(self.goals)
         if subgoal_met:
-            self.current_goal_i = min(len(self.goals), self.current_goal_i + 1)
+            self.current_goal_i = min(len(self.goals)-1, self.current_goal_i + 1)
         self.prev_state = state
         self.prev_action_label = action
         return subgoal_met #and not last_goal
