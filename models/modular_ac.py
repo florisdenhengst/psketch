@@ -67,7 +67,7 @@ class ModularACModel(object):
         
         # number of actions in the world + 'STOP'
         self.n_actions = world.n_actions + 1
-        self.n_net_actions = self.n_actions - 1
+        self.n_net_actions = self.n_actions
         self.STOP = world.n_actions
         self.FORCE_STOP = self.n_actions + 1
         # number of times train() has been completed
@@ -84,7 +84,7 @@ class ModularACModel(object):
                 # NOTE FdH: this hardcodes a bias against the last action, STOP in the original work
                 v_bias = v_action[-1]
                 assert "b1" in v_bias.name
-                t_decrement_op = v_bias[-1].assign(v_bias[-1] - 0)
+                t_decrement_op = v_bias[-1].assign(v_bias[-1] - 3)
 
                 t_action_logprobs = tf.nn.log_softmax(t_action_score)
                 t_chosen_prob = tf.math.reduce_sum(t_action_mask * t_action_logprobs, 
@@ -246,22 +246,33 @@ class ModularACModel(object):
         running_reward = 0
         shaped_running_reward = 0
         shaping_r = 0
+        logging.debug('B=====================')
         for transition in episode[::-1]:
-            if transition.a == self.STOP:
+            if transition.md:
+                logging.debug("Symbolic Action done!")
                 shaping_r = self.shaping_reward
             else:
                 shaping_r = 0
+            rr = running_reward
+            srr = shaped_running_reward
             running_reward = running_reward * DISCOUNT + transition.r
             shaped_running_reward = shaped_running_reward * DISCOUNT + shaping_r
+            logging.debug('{} = {} * {} + {}      +          {} * {} + {}'.format(
+                running_reward + shaped_running_reward,
+                rr, DISCOUNT, transition.r,
+                srr, DISCOUNT, shaping_r
+                ))
             n_transition = transition._replace(r=running_reward + shaped_running_reward)
-            if n_transition.a < self.STOP:
+            if n_transition.a < self.n_actions:
                 self.experiences.append(n_transition)
             elif n_transition.a == self.FORCE_STOP:
+                logging.debug('FORCE STOP')
                 # STOP due to too many timesteps
                 shaped_running_reward = 0
                 pass
             elif n_transition.a != self.STOP:
                 raise ValueError('Unknown action {}'.format(n_transition.a))
+        logging.debug('E=====================')
 
     def featurize(self, state, mstate):
         if self.config.model.featurize_plan:
@@ -285,6 +296,7 @@ class ModularACModel(object):
 
         action = [None] * n_act_batch
         terminate = [None] * n_act_batch
+        module_done = [False] * n_act_batch
 
         for k, indices in by_mod.items():
             i_task, i_subtask = k
@@ -311,14 +323,14 @@ class ModularACModel(object):
                     #logging.debug("Force STOP: {} ({}->{}):\n{}".format(
                     #    prev_goal,
                     #        prev_a_lab, a, states[i].pp()))
-                    a = self.STOP
+                    module_done[i] = True
                 if a == self.STOP or a == self.FORCE_STOP:
                     self.i_subtask[i] += 1
                     self.i_step[i] = 0.
                 t = self.i_subtask[i] >= len(self.subtasks[indices[0]])
                 action[i] = a
                 terminate[i] = t
-        return action, terminate
+        return action, terminate, module_done
 
     def get_state(self):
         out = []
@@ -374,7 +386,7 @@ class ModularACModel(object):
             # FdH: is i_batch ever > 0? since len(all_exps) is always < N_BATCH (subset of)
             for i_batch in range(int(np.ceil(1. * len(all_exps) / N_BATCH))):
                 exps = all_exps[i_batch * N_BATCH : (i_batch + 1) * N_BATCH]
-                s1, m1, a, s2, m2, r = zip(*exps)
+                s1, m1, a, s2, m2, r, md = zip(*exps)
                 feats1 = [self.featurize(s, m) for s, m in zip(s1, m1)]
                 args1 = [m.arg for m in m1]
                 # steps are the symbolic actions to in a task

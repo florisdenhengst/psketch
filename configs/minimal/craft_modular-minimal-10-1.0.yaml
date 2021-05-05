@@ -1,0 +1,18 @@
+model:
+  baseline: state
+  featurize_plan: false
+  max_subtask_timesteps: 15
+  name: ModularACModel
+  shaping_reward: 1.0
+  use_args: false
+name: craft_modular-minimal-10-1.0
+recipes: resources/craft/recipes.yaml
+seed: 10
+trainer:
+  hints: resources/craft/hints-minimal.yaml
+  improvement_threshold: 0.8
+  max_timesteps: 100
+  name: CurriculumTrainer
+  use_curriculum: true
+world:
+  name: CraftWorld

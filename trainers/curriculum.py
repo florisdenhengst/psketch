@@ -57,6 +57,7 @@ class CurriculumTrainer(object):
         tasks = []
         goal_names = []
         goal_args = []
+        module_done = []
 
         # choose N_BATCH tasks and initialize model N_BATCH times
         for _ in range(N_BATCH):
@@ -81,9 +82,11 @@ class CurriculumTrainer(object):
         while not all(done) and timer > 0:
             # takes N_BATCH steps simultaneously
             mstates_before = model.get_state()
-            action, terminate = model.act(states_before)
+            action, terminate, module_done = model.act(states_before)
             mstates_after = model.get_state()
             states_after = [None for _ in range(N_BATCH)]
+            module_done = [0 for _ in range(N_BATCH)]
+
             for i in range(N_BATCH):
                 if action[i] is None:
                     assert done[i]
@@ -100,7 +103,7 @@ class CurriculumTrainer(object):
                 if not done[i]:
                     transitions[i].append(Transition(
                             states_before[i], mstates_before[i], action[i], 
-                            states_after[i], mstates_after[i], reward))
+                            states_after[i], mstates_after[i], reward, module_done[i]))
                     total_reward += reward
 
                 if terminate[i]:

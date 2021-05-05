@@ -1,0 +1,19 @@
+name: light_joint-plan-2
+recipes: "resources/light/recipes.yaml"
+seed: 2
+world: 
+  name: LightWorld 
+model: 
+  name: ModularACModel
+  use_args: true
+  # whether the task ID (sequence of actions) is fed to the agent in a 1-hot encoding and with shared networks
+  featurize_plan: false
+  max_subtask_timesteps: 15
+  baseline: state
+  shaping_reward: 0
+trainer: 
+  name: CurriculumTrainer
+  use_curriculum: true
+  improvement_threshold: 0.8
+  hints: "resources/light/hints.joint.yaml"
+  max_timesteps: 100
