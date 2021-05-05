@@ -246,10 +246,8 @@ class ModularACModel(object):
         running_reward = 0
         shaped_running_reward = 0
         shaping_r = 0
-        logging.debug('B=====================')
         for transition in episode[::-1]:
             if transition.md:
-                logging.debug("Symbolic Action done!")
                 shaping_r = self.shaping_reward
             else:
                 shaping_r = 0
@@ -257,22 +255,15 @@ class ModularACModel(object):
             srr = shaped_running_reward
             running_reward = running_reward * DISCOUNT + transition.r
             shaped_running_reward = shaped_running_reward * DISCOUNT + shaping_r
-            logging.debug('{} = {} * {} + {}      +          {} * {} + {}'.format(
-                running_reward + shaped_running_reward,
-                rr, DISCOUNT, transition.r,
-                srr, DISCOUNT, shaping_r
-                ))
             n_transition = transition._replace(r=running_reward + shaped_running_reward)
             if n_transition.a < self.n_actions:
                 self.experiences.append(n_transition)
             elif n_transition.a == self.FORCE_STOP:
-                logging.debug('FORCE STOP')
                 # STOP due to too many timesteps
                 shaped_running_reward = 0
                 pass
             elif n_transition.a != self.STOP:
                 raise ValueError('Unknown action {}'.format(n_transition.a))
-        logging.debug('E=====================')
 
     def featurize(self, state, mstate):
         if self.config.model.featurize_plan:
