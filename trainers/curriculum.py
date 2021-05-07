@@ -85,7 +85,6 @@ class CurriculumTrainer(object):
             action, terminate, module_done = model.act(states_before)
             mstates_after = model.get_state()
             states_after = [None for _ in range(N_BATCH)]
-            module_done = [0 for _ in range(N_BATCH)]
 
             for i in range(N_BATCH):
                 if action[i] is None:
