@@ -261,7 +261,7 @@ class ModularActorModularCriticModel(object):
                 # STOP due to too many timesteps
                 shaped_running_reward = 0
                 pass
-            else:
+            elif n_transition.a != self.STOP:
                 raise ValueError('Unknown action {}'.format(n_transition.a))
 
     def featurize(self, state, mstate):
@@ -312,7 +312,7 @@ class ModularActorModularCriticModel(object):
                     #logging.debug("Force STOP: {} ({}->{}):\n{}".format(
                     #    prev_goal,
                     #        prev_a_lab, a, states[i].pp()))
-                    a = self.FORCE_STOP
+                    a = self.STOP
                 if a == self.STOP or a == self.FORCE_STOP:
                     self.i_subtask[i] += 1
                     self.i_step[i] = 0.

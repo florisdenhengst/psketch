@@ -1,0 +1,17 @@
+model:
+  baseline: state
+  featurize_plan: false
+  max_subtask_timesteps: 15
+  name: ModularActorModularCriticModel
+  use_args: false
+name: light_modular-0-forcestop
+recipes: resources/light/recipes.yaml
+seed: 0
+trainer:
+  hints: resources/light/hints.yaml
+  improvement_threshold: 0.8
+  max_timesteps: 100
+  name: CurriculumTrainer
+  use_curriculum: true
+world:
+  name: LightWorld
