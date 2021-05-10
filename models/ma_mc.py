@@ -171,13 +171,13 @@ class ModularActorModularCriticModel(object):
                 critic = common_critic
             else:
                 critic = build_critic(i_module, t_input, t_reward, extra_params=xp)
-            for i_task in range(self.n_modules):
+            for i_task in range(self.n_tasks):
                 # NOTE FdH: could remove the duplication over tasks? Because each module gets a critic, not each task-module tuple
                 critics[(i_task, i_module)] = critic
 
         for i_module in range(self.n_modules):
             for i_task in range(self.n_tasks):
-                critic = critics[i_task, i_module]
+                critic = critics[(i_task, i_module)]
                 critic_trainer = build_critic_trainer(t_reward, critic)
                 critic_trainers[i_task, i_module] = critic_trainer
 
