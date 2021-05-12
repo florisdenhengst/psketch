@@ -31,6 +31,7 @@ class CurriculumTrainer(object):
         # organize task and subtask indices
         self.tasks_by_subtask = defaultdict(list)
         self.tasks = []
+        self.n_train = self.config.trainer.n_train
         for hint_key, hint in self.hints.items():
             goal = util.parse_fexp(hint_key)
             goal = (self.subtask_index.index(goal[0]), self.cookbook.index[goal[1]])
@@ -123,7 +124,9 @@ class CurriculumTrainer(object):
         i_iter = 0
 
         task_probs = []
-        while i_iter < N_ITERS: # FdH: N_ITERS = 30K
+        n = 0
+        while n < self.n_train: # FdH: N_ITERS = 30K
+            logging.debug("[train step] %d", n)
             logging.debug("[iteration] %d", i_iter)
             logging.debug("[max steps] %d", max_steps)
             min_reward = np.inf
@@ -173,6 +176,7 @@ class CurriculumTrainer(object):
 
                 # log
                 logging.info("[step] %d", i_iter)
+                logging.info("[n train] %d", n)
                 scores = []
                 for i, task in enumerate(possible_tasks):
                     i_task = self.task_index[task]
@@ -191,6 +195,7 @@ class CurriculumTrainer(object):
                 logging.info("[error] %s", total_err / N_UPDATE)
                 logging.info("")
                 min_reward = min(min_reward, min(scores))
+                n += 1
 
                 # recompute task probs
                 if self.config.trainer.use_curriculum:
@@ -210,4 +215,4 @@ class CurriculumTrainer(object):
             logging.info("")
             if min_reward > self.config.trainer.improvement_threshold:
                 max_steps += 1
-                model.save()
+        model.save()
