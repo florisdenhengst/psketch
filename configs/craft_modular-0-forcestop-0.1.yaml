@@ -14,5 +14,6 @@ trainer:
   max_timesteps: 100
   name: CurriculumTrainer
   use_curriculum: true
+  n_train: 30
 world:
   name: CraftWorld

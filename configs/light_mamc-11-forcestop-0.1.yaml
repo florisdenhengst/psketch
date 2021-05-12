@@ -5,7 +5,7 @@ model:
   name: ModularActorModularCriticModel
   shaping_reward: 0.1
   use_args: false
-name: light_modular-11-forcestop-0.1
+name: light_mamc-11-forcestop-0.1
 recipes: resources/light/recipes.yaml
 seed: 11
 trainer:
