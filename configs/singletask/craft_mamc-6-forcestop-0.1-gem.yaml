@@ -1,0 +1,19 @@
+model:
+  baseline: state
+  featurize_plan: false
+  max_subtask_timesteps: 15
+  name: ModularActorModularCriticModel
+  shaping_reward: 0.1
+  use_args: false
+name: craft_mamc-6-forcestop-0.1-gem
+recipes: resources/craft/recipes.yaml
+seed: 6
+trainer:
+  n_train: 30
+  hints: resources/craft/gem.yaml
+  improvement_threshold: 0.8
+  max_timesteps: 100
+  name: CurriculumTrainer
+  use_curriculum: true
+world:
+  name: CraftWorld
