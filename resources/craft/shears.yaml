@@ -1,0 +1,2 @@
+"make[shears]":
+  ["get_wood", "make1", "get_iron", "make1"]
