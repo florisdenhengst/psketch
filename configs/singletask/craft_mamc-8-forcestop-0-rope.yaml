@@ -2,10 +2,10 @@ model:
   baseline: state
   featurize_plan: false
   max_subtask_timesteps: 15
-  name: ModularACModel
+  name: ModularActorModularCriticModel
   shaping_reward: 0
   use_args: false
-name: craft_modular-8-0-rope
+name: craft_mamc-8-forcestop-0-rope
 recipes: resources/craft/recipes.yaml
 seed: 8
 trainer:
