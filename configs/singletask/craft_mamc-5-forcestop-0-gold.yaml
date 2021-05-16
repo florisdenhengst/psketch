@@ -2,10 +2,10 @@ model:
   baseline: state
   featurize_plan: false
   max_subtask_timesteps: 15
-  name: ModularACModel
+  name: ModularActorModularCriticModel
   shaping_reward: 0
   use_args: false
-name: craft_modular-5-0-gold
+name: craft_mamc-5-forcestop-0-gold
 recipes: resources/craft/recipes.yaml
 seed: 5
 trainer:
