@@ -313,6 +313,8 @@ class ModularActorModularCriticModel(object):
                     #    prev_goal,
                     #        prev_a_lab, a, states[i].pp()))
                     a = self.STOP
+                if a == self.FORCE_STOP:
+                    self.dks[i].advance()
                 if a == self.STOP or a == self.FORCE_STOP:
                     self.i_subtask[i] += 1
                     self.i_step[i] = 0.

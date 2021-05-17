@@ -11,6 +11,9 @@ class LightWorldDomainKnowledge():
         self.goals = goals
         self.current_goal_i = 0
     
+    def advance(self):
+        self.current_goal_i = min(len(self.goals), self.current_goal_i + 1)
+    
     def tick(self, state, action):
         observation = state.features()
         subgoal_met = False
@@ -47,6 +50,9 @@ class CraftWorldDomainKnowledge():
         self.goals = goals
         self.current_goal_i = 0
         self.cookbook = cookbook
+
+    def advance(self):
+        self.current_goal_i = min(len(self.goals), self.current_goal_i + 1)
 
     def tick(self, state, action):
         subgoal_met = self.subgoal_met(state, action)
