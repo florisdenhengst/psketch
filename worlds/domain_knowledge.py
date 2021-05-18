@@ -11,17 +11,20 @@ class LightWorldDomainKnowledge():
         self.goals = goals
         self.current_goal_i = 0
     
-    def tick(self, state, action):
+    def tick(self, state, action, advance=False):
         observation = state.features()
         subgoal_met = False
         #last_goal = self.current_goal_i == len(self.goals)
         if self.prev_action_label != None:
             subgoal_met = self.subgoal_met(observation)
-            if subgoal_met:
+            if subgoal_met and advance:
                 self.current_goal_i = min(len(self.goals) - 1, self.current_goal_i + 1)
         self.prev_observation = observation
         self.prev_action_label = action
         return subgoal_met #and not last_goal
+
+    def advance(self):
+         self.current_goal_i = min(len(self.goals)-1, self.current_goal_i + 1)
 
     def in_door(self, observation):
         return observation[:4].sum() == 4.0
@@ -48,14 +51,17 @@ class CraftWorldDomainKnowledge():
         self.current_goal_i = 0
         self.cookbook = cookbook
 
-    def tick(self, state, action):
+    def tick(self, state, action, advance=False):
         subgoal_met = self.subgoal_met(state, action)
         #last_goal = self.current_goal_i == len(self.goals)
-        if subgoal_met:
+        if subgoal_met and advance:
             self.current_goal_i = min(len(self.goals)-1, self.current_goal_i + 1)
         self.prev_state = state
         self.prev_action_label = action
         return subgoal_met #and not last_goal
+
+    def advance(self):
+         self.current_goal_i = min(len(self.goals)-1, self.current_goal_i + 1)
 
     def check_inventory(self, state, keyword):
         # TODO FdH:

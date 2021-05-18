@@ -316,6 +316,7 @@ class ModularACModel(object):
                     #        prev_a_lab, a, states[i].pp()))
                     module_done[i] = True
                 if a == self.STOP or a == self.FORCE_STOP:
+                    self.dks[i].advance()
                     self.i_subtask[i] += 1
                     self.i_step[i] = 0.
                 t = self.i_subtask[i] >= len(self.subtasks[indices[0]])
