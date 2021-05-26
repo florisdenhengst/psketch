@@ -1,0 +1,19 @@
+model:
+  baseline: state
+  featurize_plan: false
+  max_subtask_timesteps: 15
+  name: ActorCriticModel
+  shaping_reward: 0
+  use_args: false
+name: craft_ac-7-forcestop-0-gem
+recipes: resources/craft/recipes.yaml
+seed: 7
+trainer:
+  hints: resources/craft/gem.yaml
+  improvement_threshold: 0.8
+  max_timesteps: 100
+  n_train: 30
+  name: CurriculumTrainer
+  use_curriculum: true
+world:
+  name: CraftWorld

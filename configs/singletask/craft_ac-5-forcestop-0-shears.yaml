@@ -1,0 +1,19 @@
+model:
+  baseline: state
+  featurize_plan: false
+  max_subtask_timesteps: 15
+  name: ActorCriticModel
+  shaping_reward: 0
+  use_args: false
+name: craft_ac-5-forcestop-0-shears
+recipes: resources/craft/recipes.yaml
+seed: 5
+trainer:
+  hints: resources/craft/shears.yaml
+  improvement_threshold: 0.8
+  max_timesteps: 100
+  n_train: 30
+  name: CurriculumTrainer
+  use_curriculum: true
+world:
+  name: CraftWorld
