@@ -1,6 +1,7 @@
 from .reflex import ReflexModel
 from .attentive import AttentiveModel
 from .modular import ModularModel
+from .ac import ActorCriticModel
 from .modular_ac import ModularACModel
 from .ma_mc import ModularActorModularCriticModel
 from .keyboard import KeyboardModel
