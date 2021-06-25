@@ -1,6 +1,7 @@
 from misc import util
 from misc.experience import Transition
 from worlds.cookbook import Cookbook
+from worlds import domain_knowledge
 
 from collections import defaultdict, namedtuple
 import itertools
@@ -24,6 +25,11 @@ class CurriculumTrainer(object):
         self.task_index = util.Index()
         with open(config.trainer.hints) as hints_f:
             self.hints = yaml.load(hints_f)
+        
+        self.dk_model = domain_knowledge.domain_model(config)
+        self.symbolic_action_index = util.Index()
+        for sa in self.dk_model.symbolic_actions:
+            self.symbolic_action_index.index(sa)
 
         # initialize randomness
         self.random = np.random.RandomState(config.seed)
@@ -82,7 +88,7 @@ class CurriculumTrainer(object):
         while not all(done) and timer > 0:
             # takes N_BATCH steps simultaneously
             mstates_before = model.get_state()
-            action, terminate = model.act(states_before)
+            action, terminate, symbolic_act = model.act(states_before)
             mstates_after = model.get_state()
             states_after = [None for _ in range(N_BATCH)]
             for i in range(N_BATCH):
@@ -100,7 +106,7 @@ class CurriculumTrainer(object):
 
                 if not done[i]:
                     transitions[i].append(Transition(
-                            states_before[i], mstates_before[i], action[i], 
+                            states_before[i], mstates_before[i], symbolic_act[i], action[i], 
                             states_after[i], mstates_after[i], reward))
                     total_reward += reward
 

@@ -69,6 +69,9 @@ class Index:
         idx = self[item]
         assert idx != 0
         return idx
+    
+    def items(self):
+        return self.contents.items()
 
     def get(self, idx):
         if idx == 0:

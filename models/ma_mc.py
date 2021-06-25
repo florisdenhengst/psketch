@@ -57,7 +57,7 @@ class ModularActorModularCriticModel(object):
         # number of tasks
         self.n_tasks = len(trainer.task_index)
         # number of symbolic actions
-        self.n_modules = len(trainer.subtask_index)
+        self.n_modules = len(trainer.symbolic_action_index)
         # max number of actions per task
         self.max_task_steps = max(len(t.steps) for t in trainer.task_index.contents.keys())
         if self.config.model.featurize_plan:
@@ -151,13 +151,13 @@ class ModularActorModularCriticModel(object):
 
         if self.config.model.featurize_plan:
             actor = build_actor(0, t_input, t_action_mask, extra_params=xp)
-            for i_module in range(self.n_modules):
-                actors[i_module] = actor
+            for i, item in self.trainer.symbolic_action_index.items():
+                actors[i] = actor
         else:
             logging.debug("Building {} actors".format(self.n_modules))
-            for i_module in range(self.n_modules):
-                actor = build_actor(i_module, t_input, t_action_mask, extra_params=xp)
-                actors[i_module] = actor
+            for i, item in self.trainer.symbolic_action_index.items():
+                actor = build_actor(i, t_input, t_action_mask, extra_params=xp)
+                actors[i] = actor
 
         if self.config.model.baseline == "common":
             logging.debug("Building single shared critic".format(self.n_tasks))
@@ -165,25 +165,24 @@ class ModularActorModularCriticModel(object):
         else:
             logging.debug("Building {} critics".format(self.n_tasks))
 
-        # NOTE FdH: makes a critic per symbol rather than task
-        for i_module in range(self.n_modules):
+        for i, item in self.trainer.symbolic_action_index.items():
             if self.config.model.baseline == "common":
                 critic = common_critic
             else:
-                critic = build_critic(i_module, t_input, t_reward, extra_params=xp)
+                critic = build_critic(i, t_input, t_reward, extra_params=xp)
             for i_task in range(self.n_tasks):
                 # NOTE FdH: could remove the duplication over tasks? Because each module gets a critic, not each task-module tuple
-                critics[(i_task, i_module)] = critic
+                critics[(i_task, i)] = critic
 
-        for i_module in range(self.n_modules):
+        for i, item in self.trainer.symbolic_action_index.items():
             for i_task in range(self.n_tasks):
-                critic = critics[(i_task, i_module)]
+                critic = critics[(i_task, i)]
                 critic_trainer = build_critic_trainer(t_reward, critic)
-                critic_trainers[i_task, i_module] = critic_trainer
+                critic_trainers[i_task, i] = critic_trainer
 
-                actor = actors[i_module]
+                actor = actors[i]
                 actor_trainer = build_actor_trainer(actor, critic, t_reward)
-                actor_trainers[i_task, i_module] = actor_trainer
+                actor_trainers[i_task, i] = actor_trainer
 
         self.t_gradient_placeholders = {}
         self.t_update_gradient_op = None
@@ -212,8 +211,8 @@ class ModularActorModularCriticModel(object):
         for i in range(n_act_batch):
             if self.config.model.use_args:
                 subtasks, args = zip(*tasks[i].steps)
-                logging.debug(subtasks)
-                logging.debug(args)
+#                logging.debug(subtasks)
+#                logging.debug(args)
             else:
                 subtasks = tasks[i].steps
                 args = [None] * len(subtasks)
@@ -222,9 +221,12 @@ class ModularActorModularCriticModel(object):
             self.i_task.append(self.trainer.task_index[tasks[i]])
             steps = tasks[i].steps
             steps = [self.trainer.subtask_index.indicesof(step) for step in steps]
-            self.dks.append(self.dk_model(steps, self.trainer.cookbook))
+            self.dks.append(self.dk_model.make(tasks[i].goal[1], steps, self.trainer.cookbook))
         # list storing the subtask for each episode
         self.i_subtask = [0 for _ in range(n_act_batch)]
+        # vector of metacontroller states for each episode
+        self.i_metacontroller_state = np.zeros(n_act_batch)
+        self.symbolic_action = [None,] * n_act_batch
         self.i_step = np.zeros((n_act_batch, 1))
         self.randoms = []
         for _ in range(n_act_batch):
@@ -247,7 +249,12 @@ class ModularActorModularCriticModel(object):
         running_reward = 0
         shaped_running_reward = 0
         shaping_r = 0
-        for transition in episode[::-1]:
+        running_sa = None
+        # TODO FdH: remove
+        ep_len = len(episode)
+        for i, transition in enumerate(episode[::-1]):
+            # TODO FdH: fix rolling sa
+#            logging.debug('EXP sa {}: {}'.format(ep_len - i, transition.sa1))
             if transition.a == self.STOP:
                 shaping_r = self.shaping_reward
             else:
@@ -278,50 +285,73 @@ class ModularActorModularCriticModel(object):
         self.i_step += 1
         by_mod = defaultdict(list)
         n_act_batch = len(self.i_subtask)
-
-        # by_mod maps (task, subtask) tuples to indices of episodes in the batch
-        for i in range(n_act_batch):
-            by_mod[self.i_task[i], self.i_subtask[i]].append(i)
-
-
         action = [None] * n_act_batch
         terminate = [None] * n_act_batch
+        symbolic_action = [None] * n_act_batch
+        
+        # for all states/episodes:
+        # if SA is taking too long sample FORCE_STOP
+        force_stops_i = self.i_step >= self.config.model.max_subtask_timesteps
+        continue_i = self.i_step >= self.config.model.max_subtask_timesteps
+        for i in np.where(force_stops_i)[0]:
+            action[i] = self.FORCE_STOP
+            symbolic_action[i] = self.symbolic_action[i]
+            # advance() automaton to random subsequent state
+            self.dks[i].advance(self.randoms[i])
+#            logging.debug('ACT {}: FORCE STOP'.format(i))
 
-        for k, indices in by_mod.items():
-            i_task, i_subtask = k
-            if i_subtask >= len(self.subtasks[indices[0]]):
+        # TODO FdH: vectorize this loop if slow, esp. tensorflow self.session.run() calls
+        # if not FORCE_STOP:
+        for i in np.where(np.logical_not(force_stops_i))[0]:
+            # determine available SAs
+            # TODO FdH: check whether this check for None (end of episode?) is correct
+            if states[i] is None:
                 continue
-            actor = self.actors[self.subtasks[indices[0]][i_subtask]]
-            feed_dict = {
-                self.inputs.t_feats: [self.featurize(states[i], mstates[i]) for i in indices],
-            }
-            if self.config.model.use_args:
-                feed_dict[self.inputs.t_arg] = [mstates[i].arg for i in indices]
-
-            logprobs = self.session.run([actor.t_probs], feed_dict=feed_dict)[0]
-            probs = np.exp(logprobs)
-            for pr, i in zip(probs, indices):
-
-                if self.i_step[i] >= self.config.model.max_subtask_timesteps:
-                    # Force the 'STOP' action
-                    a = self.FORCE_STOP
+            symbolic_actions, advanced, terminated = self.dks[i].tick(states[i])
+            if terminated:
+                logging.debug("FULL EPISODE DONE!")
+            terminate[i] = terminated
+            if advanced:
+                action[i] = self.STOP
+                symbolic_action[i] = self.symbolic_action[i]
+            else:
+                # collect value estimates for all available SAs
+                feed_dict = {
+                    self.inputs.t_feats: [self.featurize(states[i], mstates[i])],
+                }
+                if self.config.model.use_args:
+                    feed_dict[self.inputs.t_arg] = [mstates[i].arg]
+                if len(symbolic_actions) > 1:
+                    v_sas = []
+#                    logging.debug('ACT{}: available acts {}'.format(i, symbolic_actions))
+                    for sa in symbolic_actions:
+                        sa_i = self.trainer.symbolic_action_index.index(sa)
+#                        logging.debug("SA in INDEX: {}".format(sa))
+                        critic = self.critics[0, sa] # critic for this task + symbolic action
+                        value = self.session.run([critic.t_value], feed_dict=feed_dict)[0]
+#                        logging.debug('ACT{}: critic {} value {}'.format(i, sa_i, symbolic_actions))
+                        v_sas.append((sa_i, value))
+#                    logging.debug('ACT{}: critics predict {}'.format(i, v_sas))
+                    # select SA with highest value
+                    actor_i, value = max(v_sas, key=lambda x: x[1])
+#                    logging.debug('ACT{}: max critic predict {}'.format(i, actor_i))
                 else:
-                    a = self.randoms[i].choice(self.n_net_actions, p=pr)
-                if self.dks[i].tick(states[i], a):
-                    # Force the 'STOP' action due to subgoal
-                    #logging.debug("Force STOP: {} ({}->{}):\n{}".format(
-                    #    prev_goal,
-                    #        prev_a_lab, a, states[i].pp()))
-                    a = self.STOP
-                if a == self.FORCE_STOP:
-                    self.dks[i].advance()
-                if a == self.STOP or a == self.FORCE_STOP:
-                    self.i_subtask[i] += 1
-                    self.i_step[i] = 0.
-                t = self.i_subtask[i] >= len(self.subtasks[indices[0]])
-                action[i] = a
-                terminate[i] = t
-        return action, terminate
+                    actor_i = self.trainer.symbolic_action_index.index(symbolic_actions[0])
+#                logging.debug('actor_i: {}'.format(actor_i))
+                selected_sa = self.trainer.symbolic_action_index.indicesof(actor_i)
+                symbolic_action[i] = selected_sa
+                actor = self.actors[selected_sa]
+                logprobs = self.session.run([actor.t_probs], feed_dict=feed_dict)[0][0]
+                probs = np.exp(logprobs)
+#                logging.debug('ACT{}: actor {} probs {}'.format(i, selected_sa, probs))
+                action[i] = self.randoms[i].choice(self.n_net_actions, p=probs)
+#                logging.debug('ACT{}: actor {} acts {}'.format(i, selected_sa, action[i]))
+        # TODO FdH: store symbolic actions
+        # - process into episosdes in trainer/curriculum
+        # - process into experience() in ma_mc
+        # - check whether correct for training
+        self.symbolic_action = symbolic_action
+        return action, terminate, symbolic_action
 
     def get_state(self):
         out = []
@@ -330,12 +360,14 @@ class ModularActorModularCriticModel(object):
                 out.append(ModelState(None, None, None, None, [0.], None))
             else:
                 out.append(ModelState(
-                        self.subtasks[i][self.i_subtask[i]], 
-                        self.args[i][self.i_subtask[i]], 
-                        len(self.args) - self.i_subtask[i],
-                        self.i_task[i],
-                        self.i_step[i].copy(),
-                        self.i_subtask[i]))
+                        self.symbolic_action[i],
+#                        self.subtasks[i][self.i_subtask[i]], # action
+                        self.args[i][self.i_subtask[i]], # arg 
+                        len(self.args) - self.i_subtask[i], # remaining
+                        self.i_task[i], # task
+                        self.i_step[i].copy(), # step
+                        self.i_subtask[i]) # at_subtask
+                        )
         return out
 
     def train(self, action=None, update_actor=True, update_critic=True):
@@ -352,7 +384,7 @@ class ModularActorModularCriticModel(object):
         # mapping modules, i.e. (task, symbolic action) tuples, to list of episodes
         by_mod = defaultdict(list)
         for e in batch:
-            by_mod[e.m1.task, e.m1.action].append(e)
+            by_mod[e.m1.task, e.sa1].append(e)
 
         grads = {}
         params = {}
@@ -366,7 +398,8 @@ class ModularActorModularCriticModel(object):
         total_actor_err = 0
         total_critic_err = 0
         # this loop determines the gradients for both critic and actor networks
-        for i_task, i_mod1 in sorted(by_mod):
+        for i_task, i_mod1 in by_mod.keys():
+#            logging.debug("{} {}".format(i_task, i_mod1))
             actor = self.actors[i_mod1] # actor for this symbolic action
             critic = self.critics[i_task, i_mod1] # critic for this task + symbolic action
             actor_trainer = self.actor_trainers[i_task, i_mod1]
@@ -377,7 +410,7 @@ class ModularActorModularCriticModel(object):
             # FdH: is i_batch ever > 0? since len(all_exps) is always < N_BATCH (subset of)
             for i_batch in range(int(np.ceil(1. * len(all_exps) / N_BATCH))):
                 exps = all_exps[i_batch * N_BATCH : (i_batch + 1) * N_BATCH]
-                s1, m1, a, s2, m2, r = zip(*exps)
+                s1, m1, sa1, a, s2, m2, r = zip(*exps)
                 feats1 = [self.featurize(s, m) for s, m in zip(s1, m1)]
                 args1 = [m.arg for m in m1]
                 # steps are the symbolic actions to in a task

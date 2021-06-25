@@ -317,17 +317,21 @@ class CraftState(object):
                     n_inventory[thing] += 1
                     n_grid[nx, ny, thing] = 0
                     success = True
-
+#                    logging.debug("Add to inventory: {} - {}".format(thing, cookbook.index.get(thing)))
                 elif thing in self.world.workshop_indices:
                     # TODO not with strings
                     workshop = cookbook.index.get(thing)
                     for output, inputs in cookbook.recipes.items():
                         if inputs["_at"] != workshop:
                             continue
+                        # the number of items that `USE` yields
                         yld = inputs["_yield"] if "_yield" in inputs else 1
+                        # the number of input items required to for this output
                         ing = [i for i in inputs if isinstance(i, int)]
                         if any(n_inventory[i] < inputs[i] for i in ing):
                             continue
+                        # adds item to inventory
+#                        logging.debug("Add to inventory: {}".format(thing))
                         n_inventory[output] += yld
                         for i in ing:
                             n_inventory[i] -= inputs[i]
