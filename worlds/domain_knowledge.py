@@ -239,7 +239,7 @@ class Axe(CraftWorldParallelDomainKnowledge):
                 ],
             3: [
                 T(3, 3, [None, None, False, False], ['make1',]),
-                T(3, 5, [None, True, True, False], ['make0',]),
+                T(3, 5, [None, None, True, False], ['make0',]),
                 T(3, 6, [None, None, None, True], ['make0',]),
                 ],
             4: [
@@ -296,7 +296,7 @@ class Gem(CraftWorldParallelDomainKnowledge):
                 ],
             3: [
                 T(3, 3, [None, None, False, False, False], ['make1',]),
-                T(3, 5, [None, True, True, False, False], ['make0',]),
+                T(3, 5, [None, None, True, False, False], ['make0',]),
                 T(3, 6, [None, None, None, True, False], ['get_gem',]),
                 T(3, 7, [None, None, None, None, True], ['get_gem',]),
                 ],
