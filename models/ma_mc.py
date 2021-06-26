@@ -252,24 +252,31 @@ class ModularActorModularCriticModel(object):
         running_sa = None
         # TODO FdH: remove
         ep_len = len(episode)
+        running_sa = episode[-1].sa1
         for i, transition in enumerate(episode[::-1]):
             # TODO FdH: fix rolling sa
 #            logging.debug('EXP sa {}: {}'.format(ep_len - i, transition.sa1))
             if transition.a == self.STOP:
+#                logging.debug('STOP')
                 shaping_r = self.shaping_reward
+                running_sa = episode[ep_len - i - 1].sa1
             else:
                 shaping_r = 0
             running_reward = running_reward * DISCOUNT + transition.r
             shaped_running_reward = shaped_running_reward * DISCOUNT + shaping_r
-            n_transition = transition._replace(r=running_reward + shaped_running_reward)
+            n_transition = transition._replace(r=running_reward + shaped_running_reward,
+                    sa1=running_sa)
+#            logging.debug("{} -> {}".format(transition.sa1, n_transition.sa1))
             if n_transition.a < self.STOP:
                 self.experiences.append(n_transition)
             elif n_transition.a == self.FORCE_STOP:
                 # STOP due to too many timesteps
                 shaped_running_reward = 0
+                self.running_sa = episode[ep_len - i - 1].sa1
                 pass
             elif n_transition.a != self.STOP:
                 raise ValueError('Unknown action {}'.format(n_transition.a))
+#        logging.debug('====')
 
     def featurize(self, state, mstate):
         if self.config.model.featurize_plan:
@@ -339,6 +346,9 @@ class ModularActorModularCriticModel(object):
                     actor_i = self.trainer.symbolic_action_index.index(symbolic_actions[0])
 #                logging.debug('actor_i: {}'.format(actor_i))
                 selected_sa = self.trainer.symbolic_action_index.indicesof(actor_i)
+                # TODO FdH: remove debug line
+#                if self.symbolic_action[i] is not None and selected_sa != self.symbolic_action[i]:
+#                    logging.debug('ACT: changing from {} to {}'.format(self.symbolic_action[i], selected_sa))
                 symbolic_action[i] = selected_sa
                 actor = self.actors[selected_sa]
                 logprobs = self.session.run([actor.t_probs], feed_dict=feed_dict)[0][0]
