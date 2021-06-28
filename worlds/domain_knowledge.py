@@ -109,18 +109,35 @@ class CraftWorldParallelDomainKnowledge(CraftWorldDomainKnowledge):
             'gold',
             'gem',
             ]
+    label_ia = []
    
     def __init__(self, goal, subgoals, cookbook):
         self.cookbook = cookbook
         self.state = self.states[0]
+        self.prev_obs = None
         super().__init__(goal, subgoals, cookbook)
 
-    def tick(self, observation):
+    def action_labelling(self, prev_action, prev_state, ap_ia):
+        if prev_state is None:
+           return [False,] * len(self.ap_ia)
+        # TODO FdH: remove
+        if self.state.id == 1:
+            logging.debug("MAKE0: {} and {} == USE {}".format(
+                prev_state.at_workshop(ap_ia[-1]),
+                prev_action,
+                prev_action == craft.USE)
+                )
+        return prev_state.at_workshop(ap_ia[-1]) and prev_action == craft.USE
+
+    # TODO FdH: implement action encoding instead
+    def tick(self, observation, prev_action):
         old_state = self.state
         # input atomic propositions 
-        label_i = [self.check_inventory(observation, i) for i in self.ap_i]
-        symbolic_actions = self.transition(label_i)
+        label_io = [self.check_inventory(observation, i) for i in self.ap_io]
+        label_ia = [self.action_labelling(prev_action, self.prev_obs, i) for i in self.ap_ia]
+        symbolic_actions = self.transition(label_io, label_ia)
         advance = self.state != old_state
+        self.prev_obs = observation
         return symbolic_actions, advance, self.state.terminal
 
     def advance(self, random):
@@ -130,13 +147,14 @@ class CraftWorldParallelDomainKnowledge(CraftWorldDomainKnowledge):
         target = random.choice(target_nodes)
         self.state = self.states[target]
 
-    def transition(self, labelling):
+    def transition(self, labelling_io, labelling_ia):
         """
         Transitions transducer from current state -> target state as given by
         labelling and returns output label (label_o)
         """
         # Assumes transducer deterministic (1 transition per node+label_i)
         matched = None
+        labelling = labelling_io + labelling_ia
         transitions = self.transitions[self.state.id]
         for t in transitions:
             match = []
@@ -145,13 +163,15 @@ class CraftWorldParallelDomainKnowledge(CraftWorldDomainKnowledge):
             if all(match):
                 matched = t
                 break
+        if self.state.id == 1:
+            logging.debug("Transitions: {} -> {} - {}".format(self.state.id, t.target, labelling))
         if matched is None:
             raise ValueError('No transition from state {} with labelling {}'.format(self.state.id, labelling))
         self.state = self.states[matched.target]
         return matched.label_o
 
 class Bed(CraftWorldParallelDomainKnowledge):
-    ap_i = ['wood', 'grass', 'plank', 'bed']
+    ap_io = ['wood', 'grass', 'plank', 'bed']
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -204,7 +224,7 @@ class Bed(CraftWorldParallelDomainKnowledge):
             }
 
 class Axe(CraftWorldParallelDomainKnowledge):
-    ap_i = ['wood', 'iron', 'stick', 'axe']
+    ap_io = ['wood', 'iron', 'stick', 'axe']
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -257,7 +277,7 @@ class Axe(CraftWorldParallelDomainKnowledge):
             }
 
 class Gem(CraftWorldParallelDomainKnowledge):
-    ap_i = ['wood', 'iron', 'stick', 'axe', 'gem']
+    ap_io = ['wood', 'iron', 'stick', 'axe', 'gem']
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -322,7 +342,7 @@ class Gem(CraftWorldParallelDomainKnowledge):
 
 
 class Shears(CraftWorldParallelDomainKnowledge):
-    ap_i = ['wood', 'iron', 'stick', 'shears']
+    ap_io = ['wood', 'iron', 'stick', 'shears']
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -375,7 +395,8 @@ class Shears(CraftWorldParallelDomainKnowledge):
             }
 
 class Bridge(CraftWorldParallelDomainKnowledge):
-    ap_i = ['wood', 'iron', 'bridge']
+    ap_io = ['wood', 'iron', 'bridge']
+    ap_ia = ['make2',]
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -387,33 +408,35 @@ class Bridge(CraftWorldParallelDomainKnowledge):
     # source_node.id -> [transition,]
     transitions = {
             0: [
-                T(0, 0, [False,] * 3, ['get_wood', 'get_iron']),
-                T(0, 1, [True, False, False], ['get_iron']),
-                T(0, 2, [False, True, False], ['get_wood']),
-                T(0, 4, [None, None, True], ['make2']),
+                T(0, 0, [False, False, False, None] , ['get_wood', 'get_iron',]),
+                T(0, 1, [True, False, False, None], ['get_iron']),
+                T(0, 2, [False, True, False, None], ['get_wood']),
+                T(0, 3, [True, True, False, None], ['make2']),
+                T(0, 4, [None, None, True, None], ['make2']),
                 ],
             1: [
-                T(1, 1, [None, False, False], ['get_iron']),
-                T(1, 3, [None, True, False], ['make2']),
-                T(1, 4, [None, None, True], ['make2']),
+                T(1, 1, [None, False, False, None], ['get_iron']),
+                T(1, 3, [None, True, False, None], ['make2']),
+                T(1, 4, [None, None, True, None], ['make2']),
                 ],
             2: [
-                T(2, 2, [False, None, False], ['get_wood']),
-                T(2, 3, [True, None, False], ['make2']),
-                T(2, 4, [None, None, True], ['make2']),
+                T(2, 2, [False, None, False, None], ['get_wood']),
+                T(2, 3, [True, None, False, None], ['make2']),
+                T(2, 4, [None, None, True, None], ['make2']),
                 ],
             3: [
-                T(3, 3, [None, None, False], ['make2']),
-                T(3, 4, [None, None, True], ['make2']),
+                T(3, 3, [None, None, False, False], ['make2']),
+                T(3, 4, [None, None, True, False], ['make2']),
+                T(3, 4, [None, None, False, True], ['make2']),
                 ],
 
             4: [
-                T(4, 4, [None, ] * 3, ['make2']),
+                T(4, 4, [None, ] * 4, ['make2']),
                 ],
             }
 
 class Gold(CraftWorldParallelDomainKnowledge):
-    ap_i = ['wood', 'iron', 'bridge', 'gold']
+    ap_io = ['wood', 'iron', 'bridge', 'gold']
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -460,7 +483,7 @@ class Gold(CraftWorldParallelDomainKnowledge):
             }
 
 class Stick(CraftWorldParallelDomainKnowledge):
-    ap_i = ['wood', 'stick']
+    ap_io = ['wood', 'stick']
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -482,7 +505,7 @@ class Stick(CraftWorldParallelDomainKnowledge):
             }
 
 class Rope(CraftWorldParallelDomainKnowledge):
-    ap_i = ['grass', 'rope']
+    ap_io = ['grass', 'rope']
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -504,7 +527,7 @@ class Rope(CraftWorldParallelDomainKnowledge):
             }
 
 class Cloth(CraftWorldParallelDomainKnowledge):
-    ap_i = ['grass', 'cloth']
+    ap_io = ['grass', 'cloth']
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -527,7 +550,8 @@ class Cloth(CraftWorldParallelDomainKnowledge):
 
 
 class Plank(CraftWorldParallelDomainKnowledge):
-    ap_i = ['wood', 'plank']
+    ap_io = ['wood', 'plank']
+    ap_ia = ['make0',]
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -537,15 +561,16 @@ class Plank(CraftWorldParallelDomainKnowledge):
     # source_node.id -> [transition,]
     transitions = {
             0: [
-                T(0, 0, [False, False], ['get_wood',]),
-                T(0, 1, [True, False], ['make0',]),
-                T(0, 2, [None, True], ['make0',]),
+                T(0, 0, [False, False, None], ['get_wood',]),
+                T(0, 1, [True, False, None], ['make0',]),
+                T(0, 2, [None, True, None], ['make0',]),
                 ],
             1: [
-                T(1, 1, [None, False], ['make0']),
-                T(1, 2, [None, True], ['make0']),
+                T(1, 1, [None, False, False], ['make0']),
+                T(1, 2, [None, True, None], ['make0']),
+                T(1, 2, [None, None, True], ['make0']),
                 ],
-            2: [T(2, 2, [None, None], ['make0',]),],
+            2: [T(2, 2, [None, None, None], ['make0',]),],
             }
 
 

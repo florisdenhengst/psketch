@@ -97,6 +97,11 @@ class CurriculumTrainer(object):
                 elif terminate[i]:
                     win = states_before[i].satisfies(goal_names[i], goal_args[i])
                     reward = 1 if win else 0
+                    # TODO FdH:
+                    if not win:
+                        logging.debug("TERMINATE NOT WIN {}".format(i))
+                    else:
+                        logging.debug("TERMINATE WIN")
                     states_after[i] = None
                 elif action[i] >= world.n_actions:
                     states_after[i] = states_before[i]

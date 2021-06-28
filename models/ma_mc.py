@@ -226,8 +226,10 @@ class ModularActorModularCriticModel(object):
         self.i_subtask = [0 for _ in range(n_act_batch)]
         # vector of metacontroller states for each episode
         self.i_metacontroller_state = np.zeros(n_act_batch)
-        self.symbolic_action = [None,] * n_act_batch
+        self.i_symbolic_action = [None,] * n_act_batch
+        self.i_action = [None,] * n_act_batch
         self.i_step = np.zeros((n_act_batch, 1))
+        self.i_done = np.zeros((n_act_batch, 1))
         self.randoms = []
         for _ in range(n_act_batch):
             self.randoms.append(np.random.RandomState(self.next_actor_seed))
@@ -266,7 +268,6 @@ class ModularActorModularCriticModel(object):
             shaped_running_reward = shaped_running_reward * DISCOUNT + shaping_r
             n_transition = transition._replace(r=running_reward + shaped_running_reward,
                     sa1=running_sa)
-#            logging.debug("{} -> {}".format(transition.sa1, n_transition.sa1))
             if n_transition.a < self.STOP:
                 self.experiences.append(n_transition)
             elif n_transition.a == self.FORCE_STOP:
@@ -300,27 +301,26 @@ class ModularActorModularCriticModel(object):
         # if SA is taking too long sample FORCE_STOP
         force_stops_i = self.i_step >= self.config.model.max_subtask_timesteps
         continue_i = self.i_step >= self.config.model.max_subtask_timesteps
+        
         for i in np.where(force_stops_i)[0]:
             action[i] = self.FORCE_STOP
-            symbolic_action[i] = self.symbolic_action[i]
+            symbolic_action[i] = self.i_symbolic_action[i]
             # advance() automaton to random subsequent state
             self.dks[i].advance(self.randoms[i])
 #            logging.debug('ACT {}: FORCE STOP'.format(i))
 
         # TODO FdH: vectorize this loop if slow, esp. tensorflow self.session.run() calls
         # if not FORCE_STOP:
-        for i in np.where(np.logical_not(force_stops_i))[0]:
+        for i in np.where(np.logical_and(np.logical_not(self.i_done), np.logical_not(force_stops_i)))[0]:
             # determine available SAs
-            # TODO FdH: check whether this check for None (end of episode?) is correct
-            if states[i] is None:
-                continue
-            symbolic_actions, advanced, terminated = self.dks[i].tick(states[i])
-            if terminated:
-                logging.debug("FULL EPISODE DONE!")
+            # tick with current state and previous! action
+            symbolic_actions, advanced, terminated = self.dks[i].tick(states[i], self.i_action[i])
             terminate[i] = terminated
-            if advanced:
+            if terminated:
+                self.i_done[i] = 1.
+            if advanced or terminated:
                 action[i] = self.STOP
-                symbolic_action[i] = self.symbolic_action[i]
+                symbolic_action[i] = self.i_symbolic_action[i]
             else:
                 # collect value estimates for all available SAs
                 feed_dict = {
@@ -347,8 +347,8 @@ class ModularActorModularCriticModel(object):
 #                logging.debug('actor_i: {}'.format(actor_i))
                 selected_sa = self.trainer.symbolic_action_index.indicesof(actor_i)
                 # TODO FdH: remove debug line
-#                if self.symbolic_action[i] is not None and selected_sa != self.symbolic_action[i]:
-#                    logging.debug('ACT: changing from {} to {}'.format(self.symbolic_action[i], selected_sa))
+#                if self.i_symbolic_action[i] is not None and selected_sa != self.i_symbolic_action[i]:
+#                    logging.debug('ACT: changing from {} to {}'.format(self.i_symbolic_action[i], selected_sa))
                 symbolic_action[i] = selected_sa
                 actor = self.actors[selected_sa]
                 logprobs = self.session.run([actor.t_probs], feed_dict=feed_dict)[0][0]
@@ -360,7 +360,8 @@ class ModularActorModularCriticModel(object):
         # - process into episosdes in trainer/curriculum
         # - process into experience() in ma_mc
         # - check whether correct for training
-        self.symbolic_action = symbolic_action
+        self.i_symbolic_action = symbolic_action
+        self.i_action = action
         return action, terminate, symbolic_action
 
     def get_state(self):
@@ -370,7 +371,7 @@ class ModularActorModularCriticModel(object):
                 out.append(ModelState(None, None, None, None, [0.], None))
             else:
                 out.append(ModelState(
-                        self.symbolic_action[i],
+                        self.i_symbolic_action[i],
 #                        self.subtasks[i][self.i_subtask[i]], # action
                         self.args[i][self.i_subtask[i]], # arg 
                         len(self.args) - self.i_subtask[i], # remaining
