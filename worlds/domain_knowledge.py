@@ -121,12 +121,6 @@ class CraftWorldParallelDomainKnowledge(CraftWorldDomainKnowledge):
         if prev_state is None:
            return [False,] * len(self.ap_ia)
         # TODO FdH: remove
-        if self.state.id == 1:
-            logging.debug("MAKE0: {} and {} == USE {}".format(
-                prev_state.at_workshop(ap_ia[-1]),
-                prev_action,
-                prev_action == craft.USE)
-                )
         return prev_state.at_workshop(ap_ia[-1]) and prev_action == craft.USE
 
     # TODO FdH: implement action encoding instead
@@ -163,8 +157,6 @@ class CraftWorldParallelDomainKnowledge(CraftWorldDomainKnowledge):
             if all(match):
                 matched = t
                 break
-        if self.state.id == 1:
-            logging.debug("Transitions: {} -> {} - {}".format(self.state.id, t.target, labelling))
         if matched is None:
             raise ValueError('No transition from state {} with labelling {}'.format(self.state.id, labelling))
         self.state = self.states[matched.target]

@@ -307,6 +307,7 @@ class ModularActorModularCriticModel(object):
             symbolic_action[i] = self.i_symbolic_action[i]
             # advance() automaton to random subsequent state
             self.dks[i].advance(self.randoms[i])
+            self.i_step[i] = 0.
 #            logging.debug('ACT {}: FORCE STOP'.format(i))
 
         # TODO FdH: vectorize this loop if slow, esp. tensorflow self.session.run() calls
@@ -321,6 +322,7 @@ class ModularActorModularCriticModel(object):
             if advanced or terminated:
                 action[i] = self.STOP
                 symbolic_action[i] = self.i_symbolic_action[i]
+                self.i_step[i] = 0.0
             else:
                 # collect value estimates for all available SAs
                 feed_dict = {
