@@ -261,7 +261,7 @@ class ModularActorModularCriticModel(object):
             if transition.a == self.STOP:
 #                logging.debug('STOP')
                 shaping_r = self.shaping_reward
-                running_sa = episode[ep_len - i - 1].sa1
+                running_sa = transition.sa1
             else:
                 shaping_r = 0
             running_reward = running_reward * DISCOUNT + transition.r
@@ -273,7 +273,7 @@ class ModularActorModularCriticModel(object):
             elif n_transition.a == self.FORCE_STOP:
                 # STOP due to too many timesteps
                 shaped_running_reward = 0
-                self.running_sa = episode[ep_len - i - 1].sa1
+                self.running_sa = transition.sa1
                 pass
             elif n_transition.a != self.STOP:
                 raise ValueError('Unknown action {}'.format(n_transition.a))
@@ -293,33 +293,47 @@ class ModularActorModularCriticModel(object):
         self.i_step += 1
         by_mod = defaultdict(list)
         n_act_batch = len(self.i_subtask)
-        action = [None] * n_act_batch
-        terminate = [None] * n_act_batch
-        symbolic_action = [None] * n_act_batch
+        action = [None,] * n_act_batch
+        terminate = [None,] * n_act_batch
+        symbolic_action = [None,] * n_act_batch
+        logging.debug('STEP: {}'.format(self.i_step[0]))
+        logging.debug('DK STATE ID: {} {}'.format(self.dks[0].state.id, self.dks[0].state.terminal))
+        if states[0] is not None:
+            logging.debug('GOT_WOOD: {}'.format(self.dks[0].check_inventory(states[0], 'wood')))
+        else:
+            logging.debug('STATE 0 is none')
         
-        # for all states/episodes:
-        # if SA is taking too long sample FORCE_STOP
-        force_stops_i = self.i_step >= self.config.model.max_subtask_timesteps
-        continue_i = self.i_step >= self.config.model.max_subtask_timesteps
+        for i, dk in enumerate(self.dks):
+            self.i_done[i] = self.i_done[i][0] or dk.state.terminal
+        
+        force_stops_i = np.logical_and(np.logical_not(self.i_done), self.i_step >= self.config.model.max_subtask_timesteps)
+        continue_i = np.logical_and(np.logical_not(self.i_done), np.logical_not(force_stops_i))
+        logging.debug('DONE: {}'.format(self.i_done[0]))
+        logging.debug('FORCE_STOP : {}'.format(force_stops_i[0]))
+        logging.debug('CONTINUE: {}'.format(continue_i[0]))
         
         for i in np.where(force_stops_i)[0]:
             action[i] = self.FORCE_STOP
             symbolic_action[i] = self.i_symbolic_action[i]
             # advance() automaton to random subsequent state
-            self.dks[i].advance(self.randoms[i])
+            terminated = self.dks[i].advance(self.randoms[i])
+            if terminated:
+                terminate[i] = 1.
             self.i_step[i] = 0.
-#            logging.debug('ACT {}: FORCE STOP'.format(i))
 
         # TODO FdH: vectorize this loop if slow, esp. tensorflow self.session.run() calls
         # if not FORCE_STOP:
-        for i in np.where(np.logical_and(np.logical_not(self.i_done), np.logical_not(force_stops_i)))[0]:
+        for i in np.where(continue_i)[0]:
             # determine available SAs
             # tick with current state and previous! action
+            if states[i] is None:
+                raise ValueError('State is None for {}'.format(i))
             symbolic_actions, advanced, terminated = self.dks[i].tick(states[i], self.i_action[i])
-            terminate[i] = terminated
+            if i == 0:
+                logging.debug('ADV, TERM: {}'.format(advanced, terminated))
             if terminated:
-                self.i_done[i] = 1.
-            if advanced or terminated:
+                terminate[i] = 1.
+            if advanced:
                 action[i] = self.STOP
                 symbolic_action[i] = self.i_symbolic_action[i]
                 self.i_step[i] = 0.0
@@ -345,6 +359,8 @@ class ModularActorModularCriticModel(object):
                     actor_i, value = max(v_sas, key=lambda x: x[1])
 #                    logging.debug('ACT{}: max critic predict {}'.format(i, actor_i))
                 else:
+                    if i == 0:
+                        logging.debug('SA: {}'.format(symbolic_actions[0]))
                     actor_i = self.trainer.symbolic_action_index.index(symbolic_actions[0])
 #                logging.debug('actor_i: {}'.format(actor_i))
                 selected_sa = self.trainer.symbolic_action_index.indicesof(actor_i)
@@ -362,6 +378,7 @@ class ModularActorModularCriticModel(object):
         # - process into episosdes in trainer/curriculum
         # - process into experience() in ma_mc
         # - check whether correct for training
+        logging.debug('action: {}'.format(action[0]))
         self.i_symbolic_action = symbolic_action
         self.i_action = action
         return action, terminate, symbolic_action

@@ -93,7 +93,7 @@ class CurriculumTrainer(object):
             states_after = [None for _ in range(N_BATCH)]
             for i in range(N_BATCH):
                 if action[i] is None:
-                    assert done[i]
+                    assert done[i] or terminate[i]
                 elif terminate[i]:
                     win = states_before[i].satisfies(goal_names[i], goal_args[i])
                     reward = 1 if win else 0
