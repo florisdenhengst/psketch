@@ -137,9 +137,10 @@ class CraftWorldParallelDomainKnowledge(CraftWorldDomainKnowledge):
     def advance(self, random):
         # get the available successors
         # sample one uniformly with random seed
-        target_nodes = [t.target for t in self.transitions[self.state.id]]
+        target_nodes = [t.target for t in self.transitions[self.state.id] if not self.states[t.target].terminal]
         target = random.choice(target_nodes)
         self.state = self.states[target]
+        return self.state.terminal
 
     def transition(self, labelling_io, labelling_ia):
         """
