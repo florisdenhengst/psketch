@@ -119,8 +119,8 @@ class CraftWorldParallelDomainKnowledge(CraftWorldDomainKnowledge):
 
     def action_labelling(self, prev_action, prev_state, ap_ia):
         if prev_state is None:
-           return [False,] * len(self.ap_ia)
-        # TODO FdH: remove
+           return False
+        # TODO FdH: make more generic
         return prev_state.at_workshop(ap_ia[-1]) and prev_action == craft.USE
 
     # TODO FdH: implement action encoding instead
@@ -137,8 +137,14 @@ class CraftWorldParallelDomainKnowledge(CraftWorldDomainKnowledge):
     def advance(self, random):
         # get the available successors
         # sample one uniformly with random seed
-        target_nodes = [t.target for t in self.transitions[self.state.id] if not self.states[t.target].terminal]
-        target = random.choice(target_nodes)
+        target_nodes = [t.target for t in self.transitions[self.state.id] if t.target != self.state.id]
+        terminals = [self.states[t].terminal for t in target_nodes]
+        if all(terminals):
+            target_candidates = target_nodes
+        else:
+            target_candidates = [t_id for t_id in target_nodes if not self.states[t_id].terminal]
+        target = random.choice(target_candidates)
+        assert target != self.state.id
         self.state = self.states[target]
         return self.state.terminal
 

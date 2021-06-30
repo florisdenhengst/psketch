@@ -228,7 +228,7 @@ class CraftState(object):
         here = self.grid[x, y, :]
         workshop_thing_id = self.world.cookbook.index["workshop{}".format(workshop_id)]
         for nx, ny in neighbors(self.pos, self.dir):
-            if self.grid[ny, nx, workshop_thing_id] > 0:
+            if self.grid[nx, ny, workshop_thing_id] > 0:
                 return True
         return False
 
