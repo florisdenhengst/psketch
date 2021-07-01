@@ -170,19 +170,16 @@ class ModularActorModularCriticModel(object):
                 critic = common_critic
             else:
                 critic = build_critic(i, t_input, t_reward, extra_params=xp)
-            for i_task in range(self.n_tasks):
-                # NOTE FdH: could remove the duplication over tasks? Because each module gets a critic, not each task-module tuple
-                critics[(i_task, i)] = critic
+            critics[i] = critic
 
         for i, item in self.trainer.symbolic_action_index.items():
-            for i_task in range(self.n_tasks):
-                critic = critics[(i_task, i)]
-                critic_trainer = build_critic_trainer(t_reward, critic)
-                critic_trainers[i_task, i] = critic_trainer
+            critic = critics[(i)]
+            critic_trainer = build_critic_trainer(t_reward, critic)
+            critic_trainers[i] = critic_trainer
 
-                actor = actors[i]
-                actor_trainer = build_actor_trainer(actor, critic, t_reward)
-                actor_trainers[i_task, i] = actor_trainer
+            actor = actors[i]
+            actor_trainer = build_actor_trainer(actor, critic, t_reward)
+            actor_trainers[i] = actor_trainer
 
         self.t_gradient_placeholders = {}
         self.t_update_gradient_op = None
@@ -248,7 +245,8 @@ class ModularActorModularCriticModel(object):
         logging.info("loaded %s", path)
         self.saver.restore(self.session, path)
 
-    def experience(self, episode):
+    # TODO FdH: remove print param
+    def experience(self, episode, logdebug=False):
         running_reward = 0
         shaped_running_reward = 0
         shaping_r = 0
@@ -258,27 +256,36 @@ class ModularActorModularCriticModel(object):
         running_sa = episode[-1].sa1
         for i, transition in enumerate(episode[::-1]):
             # TODO FdH: fix rolling sa
-#            logging.debug('EXP sa {}: {}'.format(ep_len - i, transition.sa1))
             if transition.a == self.STOP:
 #                logging.debug('STOP')
                 shaping_r = self.shaping_reward
                 running_sa = transition.sa1
             else:
                 shaping_r = 0
-            running_reward = running_reward * DISCOUNT + transition.r
-            shaped_running_reward = shaped_running_reward * DISCOUNT + shaping_r
+            running_reward = (running_reward * DISCOUNT) + transition.r
+            shaped_running_reward = (shaped_running_reward * DISCOUNT) + shaping_r
             n_transition = transition._replace(r=running_reward + shaped_running_reward,
                     sa1=running_sa)
+#            if logdebug:
+#                logging.debug("i: {}".format(i))
+#                logging.debug("running rewards: {} {}".format(running_reward, shaped_running_reward))
+#                logging.debug("transition: {} {} {} ".format(transition.a, transition.sa1, transition.r))
+#                logging.debug("n_transition: {} {} {} ".format(n_transition.a, n_transition.sa1, n_transition.r))
             if n_transition.a < self.STOP:
+#                if logdebug:
+#                    logging.debug('append')
                 self.experiences.append(n_transition)
             elif n_transition.a == self.FORCE_STOP:
                 # STOP due to too many timesteps
+#                if logdebug:
+#                    logging.debug('"reset"')
                 shaped_running_reward = 0
-                self.running_sa = transition.sa1
+                running_sa = transition.sa1
                 pass
             elif n_transition.a != self.STOP:
                 raise ValueError('Unknown action {}'.format(n_transition.a))
-#        logging.debug('====')
+#        if logdebug:
+#            logging.debug('===')
 
     def featurize(self, state, mstate):
         if self.config.model.featurize_plan:
@@ -298,17 +305,32 @@ class ModularActorModularCriticModel(object):
         action = [None,] * n_act_batch
         terminate = [None,] * n_act_batch
         symbolic_action = [None,] * n_act_batch
+#        logging.debug('STEP: {}'.format(self.i_step[0]))
+#        logging.debug('TOTAL: {}'.format(self.i_total_step[0]))
+#        logging.debug('DK STATE ID: {} {}'.format(self.dks[0].state.id, self.dks[0].state.terminal))
+#        if states[0] is not None:
+#            logging.debug('GOT_WOOD: {}'.format(self.dks[0].check_inventory(states[0], 'wood')))
+#            logging.debug('GOT_PLANK: {}'.format(self.dks[0].check_inventory(states[0], 'plank')))
+#            logging.debug('AT WORKSHOP 0: {}'.format(states[0].at_workshop('0')))
+#        else:
+#            logging.debug('STATE 0 is none')
+        
         for i, dk in enumerate(self.dks):
             self.i_done[i] = self.i_done[i][0] or dk.state.terminal
         
         force_stops_i = np.logical_and(np.logical_not(self.i_done), self.i_step >= self.config.model.max_subtask_timesteps)
         continue_i = np.logical_and(np.logical_not(self.i_done), np.logical_not(force_stops_i))
+#        logging.debug('DONE: {}'.format(self.i_done[0]))
+#        logging.debug('FORCE_STOP : {}'.format(force_stops_i[0]))
+#        logging.debug('CONTINUE: {}'.format(continue_i[0]))
         
         for i in np.where(force_stops_i)[0]:
             action[i] = self.FORCE_STOP
             symbolic_action[i] = self.i_symbolic_action[i]
             # advance() automaton to random subsequent state
             terminated = self.dks[i].advance(self.randoms[i])
+#            if i == 0:
+#                logging.debug('FORCE_STOP ADVANCE TO: {}'.format(self.dks[i].state.id))
             if terminated:
                 terminate[i] = 1.
             self.i_step[i] = 0.
@@ -321,6 +343,8 @@ class ModularActorModularCriticModel(object):
             if states[i] is None:
                 raise ValueError('State is None for {}'.format(i))
             symbolic_actions, advanced, terminated = self.dks[i].tick(states[i], self.i_action[i])
+#            if i == 0:
+#                logging.debug('ADV, TERM: {}, {}'.format(advanced, terminated))
             if terminated:
                 terminate[i] = 1.
             if advanced:
@@ -349,9 +373,15 @@ class ModularActorModularCriticModel(object):
                     actor_i, value = max(v_sas, key=lambda x: x[1])
 #                    logging.debug('ACT{}: max critic predict {}'.format(i, actor_i))
                 else:
+#                    if i == 0:
+#                        logging.debug('SA: {}'.format(symbolic_actions[0]))
                     actor_i = self.trainer.symbolic_action_index.index(symbolic_actions[0])
+#                    if i == 0:
+#                        logging.debug('actor_i: {} '.format(actor_i))
 #                logging.debug('actor_i: {}'.format(actor_i))
                 selected_sa = self.trainer.symbolic_action_index.indicesof(actor_i)
+#                if i == 0:
+#                    logging.debug('selected sa: {} '.format(selected_sa))
                 # TODO FdH: remove debug line
 #                if self.i_symbolic_action[i] is not None and selected_sa != self.i_symbolic_action[i]:
 #                    logging.debug('ACT: changing from {} to {}'.format(self.i_symbolic_action[i], selected_sa))
@@ -359,6 +389,8 @@ class ModularActorModularCriticModel(object):
                 actor = self.actors[selected_sa]
                 logprobs = self.session.run([actor.t_probs], feed_dict=feed_dict)[0][0]
                 probs = np.exp(logprobs)
+#                if i == 0:
+#                    logging.debug('probs: {} '.format(probs))
 #                logging.debug('ACT{}: actor {} probs {}'.format(i, selected_sa, probs))
                 action[i] = self.randoms[i].choice(self.n_net_actions, p=probs)
 #                logging.debug('ACT{}: actor {} acts {}'.format(i, selected_sa, action[i]))
@@ -366,6 +398,7 @@ class ModularActorModularCriticModel(object):
         # - process into episosdes in trainer/curriculum
         # - process into experience() in ma_mc
         # - check whether correct for training
+#        logging.debug('action: {}'.format(action[0]))
         self.i_symbolic_action = symbolic_action
         self.i_action = action
         return action, terminate, symbolic_action
@@ -401,7 +434,7 @@ class ModularActorModularCriticModel(object):
         # mapping modules, i.e. (task, symbolic action) tuples, to list of episodes
         by_mod = defaultdict(list)
         for e in batch:
-            by_mod[e.m1.task, e.sa1].append(e)
+            by_mod[e.sa1].append(e)
 
         grads = {}
         params = {}
@@ -415,15 +448,15 @@ class ModularActorModularCriticModel(object):
         total_actor_err = 0
         total_critic_err = 0
         # this loop determines the gradients for both critic and actor networks
-        for i_task, i_mod1 in by_mod.keys():
+        for i_mod1 in by_mod.keys():
 #            logging.debug("{} {}".format(i_task, i_mod1))
             actor = self.actors[i_mod1] # actor for this symbolic action
-            critic = self.critics[i_task, i_mod1] # critic for this task + symbolic action
-            actor_trainer = self.actor_trainers[i_task, i_mod1]
-            critic_trainer = self.critic_trainers[i_task, i_mod1]
+            critic = self.critics[i_mod1] # critic for this task + symbolic action
+            actor_trainer = self.actor_trainers[i_mod1]
+            critic_trainer = self.critic_trainers[i_mod1]
 
             # episodes for this (task, symbolic action) tuple
-            all_exps = by_mod[i_task, i_mod1]
+            all_exps = by_mod[i_mod1]
             # FdH: is i_batch ever > 0? since len(all_exps) is always < N_BATCH (subset of)
             for i_batch in range(int(np.ceil(1. * len(all_exps) / N_BATCH))):
                 exps = all_exps[i_batch * N_BATCH : (i_batch + 1) * N_BATCH]

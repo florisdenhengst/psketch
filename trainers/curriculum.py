@@ -174,8 +174,13 @@ class CurriculumTrainer(object):
                             total_reward_episodes += tr
                         total_reward += reward
                         count += 1
-                        for e in episodes:
-                            model.experience(e)
+                        for e_i, e in enumerate(episodes):
+                            # TODO FdH: remove logdebug nonsense
+                            if e_i == 0:
+                                logdebug = False
+                            else:
+                                logdebug = True
+                            model.experience(e, logdebug)
                         err = model.train()
                         errs.append(err)
                     total_err += err
