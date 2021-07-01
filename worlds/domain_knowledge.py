@@ -171,6 +171,7 @@ class CraftWorldParallelDomainKnowledge(CraftWorldDomainKnowledge):
 
 class Bed(CraftWorldParallelDomainKnowledge):
     ap_io = ['wood', 'grass', 'plank', 'bed']
+    ap_ia = ['make0', 'make1',]
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -182,48 +183,52 @@ class Bed(CraftWorldParallelDomainKnowledge):
             }
     transitions = {
             0: [
-                T(0, 0, [False,] * 4, ['get_wood', 'get_grass']),
-                T(0, 1, [True, False, False, False], ['get_grass', 'make0']),
-                T(0, 2, [False, True, False, False], ['get_wood',]),
-                T(0, 3, [True, True, False, False], ['make0',]),
-                T(0, 4, [None, False, True, False], ['get_grass',]),
-                T(0, 5, [None, True, True, False], ['make1',]),
-                T(0, 6, [None, None, None, True], ['make1',]),
+                T(0, 0, [False,] * 4 + [None, None,], ['get_wood', 'get_grass']),
+                T(0, 1, [True, False, False, False, None, None,], ['get_grass', 'make0']),
+                T(0, 2, [False, True, False, False, None, None,], ['get_wood',]),
+                T(0, 3, [True, True, False, False, None, None,], ['make0',]),
+                T(0, 4, [None, False, True, False, None, None,], ['get_grass',]),
+                T(0, 5, [None, True, True, False, None, None,], ['make1',]),
+                T(0, 6, [None, None, None, True, None, None,], ['make1',]),
                 ],
             1: [
-                T(1, 1, [None, False, False, False], ['get_grass', 'make0']),
-                T(1, 3, [None, True, False, False], ['make0']),
-                T(1, 4, [None, False, True, False], ['get_grass',]),
-                T(1, 5, [None, True, True, False], ['make1',]),
-                T(1, 6, [None, None, None, True], ['make1',]),
+                T(1, 1, [None, False, False, False, False, None,], ['get_grass', 'make0']),
+                T(1, 3, [None, True, False, False, False, None], ['make0']),
+                T(1, 4, [None, False, True, False, None, None], ['get_grass',]),
+                T(1, 4, [None, False, False, False, True, None], ['get_grass',]),
+                T(1, 5, [None, True, True, False, None, None], ['make1',]),
+                T(1, 6, [None, None, None, True, None, None, None], ['make1',]),
                 ],
             2: [
-                T(2, 2, [False, None, False, False], ['get_wood',]),
-                T(2, 3, [True, None, False, False], ['make0',]),
-                T(2, 5, [None, True, True, False], ['make1',]),
-                T(2, 6, [None, None, None, True], ['make1',]),
+                T(2, 2, [False, None, False, False, None, None], ['get_wood',]),
+                T(2, 3, [True, None, False, False, None, None], ['make0',]),
+                T(2, 5, [None, True, True, False, None, None], ['make1',]),
+                T(2, 6, [None, None, None, True, None, None], ['make1',]),
                 ],
             3: [
-                T(3, 3, [None, None, False, False], ['make0',]),
-                T(3, 5, [None, None, True, False], ['make1',]),
-                T(3, 6, [None, None, None, True], ['make1',]),
+                T(3, 3, [None, None, False, False, False, None], ['make0',]),
+                T(3, 5, [None, None, True, False, None, None], ['make1',]),
+                T(3, 5, [None, None, False, False, True, None], ['make1',]),
+                T(3, 6, [None, None, None, True, None, None], ['make1',]),
                 ],
             4: [
-                T(4, 4, [None, False, None, False], ['get_grass',]),
-                T(4, 5, [None, True, True, False], ['make1',]),
-                T(4, 6, [None, None, None, True], ['make1',]),
+                T(4, 4, [None, False, None, False, None, None], ['get_grass',]),
+                T(4, 5, [None, True, True, False, None, None], ['make1',]),
+                T(4, 6, [None, None, None, True, None, None], ['make1',]),
                 ],
             5: [
-                T(5, 5, [None, None, None, False], ['make1',]),
-                T(5, 6, [None, None, None, True], ['make1']),
+                T(5, 5, [None, None, None, False, None, False], ['make1',]),
+                T(5, 6, [None, None, None, True, None, None], ['make1']),
+                T(5, 6, [None, None, None, True, None, True], ['make1']),
                 ],
             6: [
-                T(6, 6, [None,] * 4, ['make1'])
+                T(6, 6, [None,] * 6, ['make1'])
                 ],
             }
 
 class Axe(CraftWorldParallelDomainKnowledge):
     ap_io = ['wood', 'iron', 'stick', 'axe']
+    ap_ia = ['make0', 'make1']
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -235,48 +240,52 @@ class Axe(CraftWorldParallelDomainKnowledge):
             }
     transitions = {
             0: [
-                T(0, 0, [False,] * 4, ['get_wood', 'get_iron']),
-                T(0, 1, [True, False, False, False], ['get_iron', 'make1']),
-                T(0, 2, [False, True, False, False], ['get_wood',]),
-                T(0, 3, [True, True, False, False], ['make1',]),
-                T(0, 4, [None, False, True, False], ['get_iron',]),
-                T(0, 5, [None, True, True, False], ['make0',]),
-                T(0, 6, [None, None, None, True], ['make0',]),
+                T(0, 0, [False,] * 4 + [None,] * 2, ['get_wood', 'get_iron']),
+                T(0, 1, [True, False, False, False, None, None,], ['get_iron', 'make1']),
+                T(0, 2, [False, True, False, False, None, None,], ['get_wood',]),
+                T(0, 3, [True, True, False, False, None, None,], ['make1',]),
+                T(0, 4, [None, False, True, False, None, None,], ['get_iron',]),
+                T(0, 5, [None, True, True, False, None, None,], ['make0',]),
+                T(0, 6, [None, None, None, True, None, None,], ['make0',]),
                 ],
             1: [
-                T(1, 1, [None, False, False, False], ['get_iron', 'make1']),
-                T(1, 3, [None, True, False, False], ['make1']),
-                T(1, 4, [None, False, True, False], ['get_iron',]),
-                T(1, 5, [None, True, True, False], ['make0',]),
-                T(1, 6, [None, None, None, True], ['make0',]),
+                T(1, 1, [None, False, False, False, None, False,], ['get_iron', 'make1']),
+                T(1, 3, [None, True, False, False, None, None,], ['make1']),
+                T(1, 4, [None, False, True, False, None, False], ['get_iron',]),
+                T(1, 4, [None, False, False, False, None, True], ['get_iron',]),
+                T(1, 5, [None, True, True, False, None, None], ['make0',]),
+                T(1, 6, [None, None, None, True, None, None], ['make0',]),
                 ],
             2: [
-                T(2, 2, [False, None, False, False], ['get_wood',]),
-                T(2, 3, [True, None, False, False], ['make1',]),
-                T(2, 5, [None, True, True, False], ['make0',]),
-                T(2, 6, [None, None, None, True], ['make0',]),
+                T(2, 2, [False, None, False, False, None, None,], ['get_wood',]),
+                T(2, 3, [True, None, False, False, None, None,], ['make1',]),
+                T(2, 5, [None, True, True, False, None, None,], ['make0',]),
+                T(2, 6, [None, None, None, True, None, None,], ['make0',]),
                 ],
             3: [
-                T(3, 3, [None, None, False, False], ['make1',]),
-                T(3, 5, [None, None, True, False], ['make0',]),
-                T(3, 6, [None, None, None, True], ['make0',]),
+                T(3, 3, [None, None, False, False, None, False], ['make1',]),
+                T(3, 5, [None, None, True, False, None, None], ['make0',]),
+                T(3, 5, [None, None, True, False, None, True], ['make0',]),
+                T(3, 6, [None, None, None, True, None, None], ['make0',]),
                 ],
             4: [
-                T(4, 4, [None, False, None, False], ['get_iron',]),
-                T(4, 5, [None, True, True, False], ['make0',]),
-                T(4, 6, [None, None, None, True], ['make0',]),
+                T(4, 4, [None, False, None, False, None, None], ['get_iron',]),
+                T(4, 5, [None, True, True, False, None, None], ['make0',]),
+                T(4, 6, [None, None, None, True, None, None], ['make0',]),
                 ],
             5: [
-                T(5, 5, [None, None, None, False], ['make0',]),
-                T(5, 6, [None, None, None, True], ['make0']),
+                T(5, 5, [None, None, None, False, False, None], ['make0',]),
+                T(5, 6, [None, None, None, True, None, None], ['make0']),
+                T(5, 6, [None, None, None, True, True, None], ['make0']),
                 ],
             6: [
-                T(6, 6, [None,] * 4, ['make0'])
+                T(6, 6, [None,] * 6, ['make0'])
                 ],
             }
 
 class Gem(CraftWorldParallelDomainKnowledge):
     ap_io = ['wood', 'iron', 'stick', 'axe', 'gem']
+    ap_ia = ['make0', 'make1']
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -289,59 +298,64 @@ class Gem(CraftWorldParallelDomainKnowledge):
             }
     transitions = {
             0: [
-                T(0, 0, [False,] * 5, ['get_wood', 'get_iron']),
-                T(0, 1, [True, False, False, False, False], ['get_iron', 'make1']),
-                T(0, 2, [False, True, False, False, False], ['get_wood',]),
-                T(0, 3, [True, True, False, False, False], ['make1',]),
-                T(0, 4, [None, False, True, False, False], ['get_iron',]),
-                T(0, 5, [None, True, True, False, False], ['make0',]),
-                T(0, 6, [None, None, None, True, False], ['get_gem',]),
-                T(0, 7, [None, None, None, None, True], ['get_gem',]),
+                T(0, 0, [False,] * 5 + [None,] * 2, ['get_wood', 'get_iron']),
+                T(0, 1, [True, False, False, False, False, None, None,], ['get_iron', 'make1']),
+                T(0, 2, [False, True, False, False, False, None, None,], ['get_wood',]),
+                T(0, 3, [True, True, False, False, False, None, None,], ['make1',]),
+                T(0, 4, [None, False, True, False, False, None, None,], ['get_iron',]),
+                T(0, 5, [None, True, True, False, False, None, None,], ['make0',]),
+                T(0, 6, [None, None, None, True, False, None, None,], ['make0',]),
+                T(0, 7, [None, None, None, None, True, None, None,], ['make0',]),
                 ],
             1: [
-                T(1, 1, [None, False, False, False, False], ['get_iron', 'make1']),
-                T(1, 3, [None, True, False, False, False], ['make1']),
-                T(1, 4, [None, False, True, False, False], ['get_iron',]),
-                T(1, 5, [None, True, True, False, False], ['make0',]),
-                T(1, 6, [None, None, None, True, False], ['get_gem',]),
-                T(1, 7, [None, None, None, None, True], ['get_gem',]),
+                T(1, 1, [None, False, False, False, False, None, False,], ['get_iron', 'make1']),
+                T(1, 3, [None, True, False, False, False, None, None,], ['make1']),
+                T(1, 4, [None, False, True, False, False, None, False], ['get_iron',]),
+                T(1, 4, [None, False, False, False, False, None, True], ['get_iron',]),
+                T(1, 5, [None, True, True, False, False, None, None], ['make0',]),
+                T(1, 6, [None, None, None, True, False, None, None], ['make0',]),
+                T(1, 7, [None, None, None, None, True, None, None], ['make0',]),
                 ],
             2: [
-                T(2, 2, [False, None, False, False, False], ['get_wood',]),
-                T(2, 3, [True, None, False, False, False], ['make1',]),
-                T(2, 5, [None, True, True, False, False], ['make0',]),
-                T(2, 6, [None, None, None, True, False], ['get_gem',]),
-                T(2, 7, [None, None, None, None, True], ['get_gem',]),
+                T(2, 2, [False, None, False, False, False, None, None,], ['get_wood',]),
+                T(2, 3, [True, None, False, False, False, None, None,], ['make1',]),
+                T(2, 5, [None, True, True, False, False, None, None,], ['make0',]),
+                T(2, 6, [None, None, None, True, False, None, None,], ['make0',]),
+                T(2, 7, [None, None, None, None, True, None, None,], ['make0',]),
                 ],
             3: [
-                T(3, 3, [None, None, False, False, False], ['make1',]),
-                T(3, 5, [None, None, True, False, False], ['make0',]),
-                T(3, 6, [None, None, None, True, False], ['get_gem',]),
-                T(3, 7, [None, None, None, None, True], ['get_gem',]),
+                T(3, 3, [None, None, False, False, False, None, False], ['make1',]),
+                T(3, 5, [None, None, True, False, False, None, None], ['make0',]),
+                T(3, 5, [None, None, True, False, False, None, True], ['make0',]),
+                T(3, 6, [None, None, None, True, False, None, None], ['make0',]),
+                T(3, 7, [None, None, None, None, True, None, None], ['make0',]),
                 ],
             4: [
-                T(4, 4, [None, False, None, False, False], ['get_iron',]),
-                T(4, 5, [None, True, True, False, False], ['make0',]),
-                T(4, 6, [None, None, None, True, False], ['get_gem',]),
-                T(4, 7, [None, None, None, None, True], ['get_gem',]),
+                T(4, 4, [None, False, None, False, False, None, None], ['get_iron',]),
+                T(4, 5, [None, True, True, False, False, None, None], ['make0',]),
+                T(4, 6, [None, None, None, True, False, None, None], ['make0',]),
+                T(4, 7, [None, None, None, None, True, None, None], ['make0',]),
                 ],
             5: [
-                T(5, 5, [None, None, None, False, False], ['make0',]),
-                T(5, 6, [None, None, None, True, False], ['get_gem']),
-                T(5, 7, [None, None, None, None, True], ['get_gem',]),
+                T(5, 5, [None, None, None, False, False, False, None], ['make0',]),
+                T(5, 6, [None, None, None, True, False, None, None], ['make0']),
+                T(5, 6, [None, None, None, True, False, True, None], ['make0']),
+                T(5, 7, [None, None, None, None, True, True, None], ['make0']),
                 ],
             6: [
-                T(6, 6, [None, None, None, None, False], ['get_gem']),
-                T(6, 7, [None, None, None, None, True], ['get_gem',]),
+                T(6, 6, [None, None, None, None, False, None, None], ['get_gem',]),
+                T(6, 7, [None, None, None, None, True, None, None], ['get_gem',]),
                 ],
             7: [
-                T(7, 7, [None,] * 5, ['get_gem',]),
+                T(7, 7, [None,] * 7, ['get_gem',]),
                 ],
             }
 
 
+
 class Shears(CraftWorldParallelDomainKnowledge):
     ap_io = ['wood', 'iron', 'stick', 'shears']
+    ap_ia = ['make1',]
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -353,43 +367,46 @@ class Shears(CraftWorldParallelDomainKnowledge):
             }
     transitions = {
             0: [
-                T(0, 0, [False,] * 4, ['get_wood', 'get_iron']),
-                T(0, 1, [True, False, False, False], ['get_iron', 'make1']),
-                T(0, 2, [False, True, False, False], ['get_wood',]),
-                T(0, 3, [True, True, False, False], ['make1',]),
-                T(0, 4, [None, False, True, False], ['get_iron',]),
-                T(0, 5, [None, True, True, False], ['make1',]),
-                T(0, 6, [None, None, None, True], ['make1',]),
+                T(0, 0, [False,] * 4 + [None,], ['get_wood', 'get_iron']),
+                T(0, 1, [True, False, False, False, None], ['get_iron', 'make1']),
+                T(0, 2, [False, True, False, False, None], ['get_wood',]),
+                T(0, 3, [True, True, False, False, None], ['make1',]),
+                T(0, 4, [None, False, True, False, None], ['get_iron',]),
+                T(0, 5, [None, True, True, False, None], ['make1',]),
+                T(0, 6, [None, None, None, True, None], ['make1',]),
                 ],
             1: [
-                T(1, 1, [None, False, False, False], ['get_iron', 'make1']),
-                T(1, 3, [None, True, False, False], ['make1']),
-                T(1, 4, [None, False, True, False], ['get_iron',]),
-                T(1, 5, [None, True, True, False], ['make1',]),
-                T(1, 6, [None, None, None, True], ['make1',]),
+                T(1, 1, [None, False, False, False, False], ['get_iron', 'make1']),
+                T(1, 3, [None, True, False, False, None], ['make1']),
+                T(1, 4, [None, False, True, False, False], ['get_iron',]),
+                T(1, 4, [None, False, False, False, True], ['get_iron',]),
+                T(1, 5, [None, True, True, False, None], ['make1',]),
+                T(1, 6, [None, None, None, True, None], ['make1',]),
                 ],
             2: [
-                T(2, 2, [False, None, False, False], ['get_wood',]),
-                T(2, 3, [True, None, False, False], ['make1',]),
-                T(2, 5, [None, True, True, False], ['make1',]),
-                T(2, 6, [None, None, None, True], ['make1',]),
+                T(2, 2, [False, None, False, False, None], ['get_wood',]),
+                T(2, 3, [True, None, False, False, None], ['make1',]),
+                T(2, 5, [None, True, True, False, None], ['make1',]),
+                T(2, 6, [None, None, None, True, None], ['make1',]),
                 ],
             3: [
-                T(3, 3, [None, None, False, False], ['make1',]),
-                T(3, 5, [None, True, True, False], ['make1',]),
-                T(3, 6, [None, None, None, True], ['make1',]),
+                T(3, 3, [None, None, False, False, False], ['make1',]),
+                T(3, 5, [None, None, True, False, None], ['make1',]),
+                T(3, 5, [None, None, False, False, True], ['make1',]),
+                T(3, 6, [None, None, None, True, None], ['make1',]),
                 ],
             4: [
-                T(4, 4, [None, False, None, False], ['get_iron',]),
-                T(4, 5, [None, True, True, False], ['make1',]),
-                T(4, 6, [None, None, None, True], ['make1',]),
+                T(4, 4, [None, False, None, False, None], ['get_iron',]),
+                T(4, 5, [None, True, True, False, None], ['make1',]),
+                T(4, 6, [None, None, None, True, None], ['make1',]),
                 ],
             5: [
-                T(5, 5, [None, None, None, False], ['make1',]),
-                T(5, 6, [None, None, None, True], ['make1']),
+                T(5, 5, [None, None, None, False, False], ['make1',]),
+                T(5, 6, [None, None, None, True, None], ['make1']),
+                T(5, 6, [None, None, None, False, True], ['make1']),
                 ],
             6: [
-                T(6, 6, [None,] * 4, ['make1'])
+                T(6, 6, [None,] * 5, ['make1'])
                 ],
             }
 
@@ -425,9 +442,8 @@ class Bridge(CraftWorldParallelDomainKnowledge):
                 ],
             3: [
                 T(3, 3, [None, None, False, False], ['make2']),
-                T(3, 4, [None, None, True, False], ['make2']),
+                T(3, 4, [None, None, True, None], ['make2']),
                 T(3, 4, [None, None, False, True], ['make2']),
-                T(3, 4, [None, None, True, True], ['make2']),
                 ],
 
             4: [
@@ -437,6 +453,7 @@ class Bridge(CraftWorldParallelDomainKnowledge):
 
 class Gold(CraftWorldParallelDomainKnowledge):
     ap_io = ['wood', 'iron', 'bridge', 'gold']
+    ap_ia = ['make2',]
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -449,41 +466,46 @@ class Gold(CraftWorldParallelDomainKnowledge):
     # source_node.id -> [transition,]
     transitions = {
             0: [
-                T(0, 0, [False,] * 4, ['get_wood', 'get_iron']),
-                T(0, 1, [True, False, False, False], ['get_iron']),
-                T(0, 2, [False, True, False, False], ['get_wood']),
-                T(0, 4, [None, None, True, False], ['get_gold']),
-                T(0, 5, [None, None, None, True], ['get_gold']),
+                T(0, 0, [False, False, False, False, None] , ['get_wood', 'get_iron',]),
+                T(0, 1, [True, False, False, False, None], ['get_iron']),
+                T(0, 2, [False, True, False, False, None], ['get_wood']),
+                T(0, 3, [True, True, False, False, None], ['make2']),
+                T(0, 4, [None, None, True, False, None], ['make2']),
+                T(0, 5, [None, None, None, True, None], ['make2']),
                 ],
             1: [
-                T(1, 1, [None, False, False, False], ['get_iron']),
-                T(1, 3, [None, True, False, False], ['make2']),
-                T(1, 4, [None, None, True, False], ['get_gold']),
-                T(1, 5, [None, None, None, True], ['get_gold']),
+                T(1, 1, [None, False, False, False, None], ['get_iron']),
+                T(1, 3, [None, True, False, False, None], ['make2']),
+                T(1, 4, [None, None, True, False, None], ['make2']),
+                T(1, 5, [None, None, None, True, None], ['make2']),
                 ],
             2: [
-                T(2, 2, [False, None, False, False], ['get_wood']),
-                T(2, 3, [True, None, False, False], ['make2']),
-                T(2, 4, [None, None, True, False], ['get_gold']),
-                T(2, 5, [None, None, None, True], ['get_gold']),
+                T(2, 2, [False, None, False, False, None], ['get_wood']),
+                T(2, 3, [True, None, False, False, None], ['make2']),
+                T(2, 4, [None, None, True, False, None], ['make2']),
+                T(2, 5, [None, None, None, True, None], ['make2']),
                 ],
             3: [
-                T(3, 3, [None, None, False, False], ['make2']),
-                T(3, 4, [None, None, True, False], ['get_gold']),
-                T(3, 5, [None, None, None, True], ['get_gold']),
+                T(3, 3, [None, None, False, False, False], ['make2']),
+                T(3, 4, [None, None, True, False, None], ['make2']),
+                T(3, 4, [None, None, False, False, True], ['make2']),
+                T(3, 5, [None, None, None, True, None], ['make2']),
                 ],
 
             4: [
-                T(4, 4, [None, None, None, False], ['get_gold']),
-                T(4, 5, [None, None, None, True], ['get_gold']),
+                T(4, 4, [None, None, None, None, False, None], ['get_gold']),
+                T(4, 5, [None, None, None, None, True, None], ['get_gold']),
                 ],
             5: [
-                T(5, 5, [None,] * 4, ['get_gold']),
+                T(5, 5, [None,] * 5, ['get_gold']),
                 ],
             }
 
+
+
 class Stick(CraftWorldParallelDomainKnowledge):
     ap_io = ['wood', 'stick']
+    ap_ia =['make1',]
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -493,19 +515,21 @@ class Stick(CraftWorldParallelDomainKnowledge):
     # source_node.id -> [transition,]
     transitions = {
             0: [
-                T(0, 0, [False, False], ['get_wood',]),
-                T(0, 1, [True, False], ['make1',]),
-                T(0, 2, [None, True], ['make1',]),
+                T(0, 0, [False, False, None], ['get_wood',]),
+                T(0, 1, [True, False, None], ['make1',]),
+                T(0, 2, [None, True, None], ['make1',]),
                 ],
             1: [
-                T(1, 1, [None, False], ['make1']),
-                T(1, 2, [None, True], ['make1']),
+                T(1, 1, [None, False, False], ['make1']),
+                T(1, 2, [None, True, None], ['make1']),
+                T(1, 2, [None, False, True], ['make1']),
                 ],
-            2: [T(2, 2, [None, None], ['make1',]),],
+            2: [T(2, 2, [None, None, None], ['make1',]),],
             }
 
 class Rope(CraftWorldParallelDomainKnowledge):
     ap_io = ['grass', 'rope']
+    ap_ia = ['make0',]
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -515,19 +539,21 @@ class Rope(CraftWorldParallelDomainKnowledge):
     # source_node.id -> [transition,]
     transitions = {
             0: [
-                T(0, 0, [False, False], ['get_grass',]),
-                T(0, 1, [True, False], ['make0',]),
-                T(0, 2, [None, True], ['make0',]),
+                T(0, 0, [False, False, None,], ['get_grass',]),
+                T(0, 1, [True, False, None,], ['make0',]),
+                T(0, 2, [None, True, None,], ['make0',]),
                 ],
             1: [
-                T(1, 1, [None, False], ['make0']),
-                T(1, 2, [None, True], ['make0']),
+                T(1, 1, [None, False, False], ['make0']),
+                T(1, 2, [None, True, None], ['make0']),
+                T(1, 2, [None, False, True], ['make0']),
                 ],
-            2: [T(2, 2, [None, None], ['make0',]),],
+            2: [T(2, 2, [None, None, None], ['make0',]),],
             }
 
 class Cloth(CraftWorldParallelDomainKnowledge):
     ap_io = ['grass', 'cloth']
+    ap_ia = ['make2',]
     states = {
             0: N(0, False),
             1: N(1, False),
@@ -537,15 +563,16 @@ class Cloth(CraftWorldParallelDomainKnowledge):
     # source_node.id -> [transition,]
     transitions = {
             0: [
-                T(0, 0, [False, False], ['get_grass',]),
-                T(0, 1, [True, False], ['make2',]),
-                T(0, 2, [None, True], ['make2',]),
+                T(0, 0, [False, False, None], ['get_grass',]),
+                T(0, 1, [True, False, None], ['make2',]),
+                T(0, 2, [None, True, None], ['make2',]),
                 ],
             1: [
-                T(1, 1, [None, False], ['make2']),
-                T(1, 2, [None, True], ['make2']),
+                T(1, 1, [None, False, False], ['make2']),
+                T(1, 2, [None, True, None], ['make2']),
+                T(1, 2, [None, False, True], ['make2']),
                 ],
-            2: [T(2, 2, [None, None], ['make2',]),],
+            2: [T(2, 2, [None, None, None], ['make2',]),],
             }
 
 

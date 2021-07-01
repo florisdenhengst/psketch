@@ -364,7 +364,7 @@ class ModularActorModularCriticModel(object):
                     for sa in symbolic_actions:
                         sa_i = self.trainer.symbolic_action_index.index(sa)
 #                        logging.debug("SA in INDEX: {}".format(sa))
-                        critic = self.critics[0, sa] # critic for this task + symbolic action
+                        critic = self.critics[sa] # critic for this task + symbolic action
                         value = self.session.run([critic.t_value], feed_dict=feed_dict)[0]
 #                        logging.debug('ACT{}: critic {} value {}'.format(i, sa_i, symbolic_actions))
                         v_sas.append((sa_i, value))
