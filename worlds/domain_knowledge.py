@@ -213,13 +213,13 @@ class Bed(CraftWorldParallelDomainKnowledge):
                 ],
             4: [
                 T(4, 4, [None, False, None, False, None, None], ['get_grass',]),
-                T(4, 5, [None, True, True, False, None, None], ['make1',]),
+                T(4, 5, [None, True, None, False, None, None], ['make1',]),
                 T(4, 6, [None, None, None, True, None, None], ['make1',]),
                 ],
             5: [
                 T(5, 5, [None, None, None, False, None, False], ['make1',]),
                 T(5, 6, [None, None, None, True, None, None], ['make1']),
-                T(5, 6, [None, None, None, True, None, True], ['make1']),
+                T(5, 6, [None, None, None, None, None, True], ['make1']),
                 ],
             6: [
                 T(6, 6, [None,] * 6, ['make1'])
@@ -252,7 +252,7 @@ class Axe(CraftWorldParallelDomainKnowledge):
                 T(1, 1, [None, False, False, False, None, False,], ['get_iron', 'make1']),
                 T(1, 3, [None, True, False, False, None, None,], ['make1']),
                 T(1, 4, [None, False, True, False, None, False], ['get_iron',]),
-                T(1, 4, [None, False, False, False, None, True], ['get_iron',]),
+                T(1, 4, [None, False, None, None, None, True], ['get_iron',]),
                 T(1, 5, [None, True, True, False, None, None], ['make0',]),
                 T(1, 6, [None, None, None, True, None, None], ['make0',]),
                 ],
@@ -265,18 +265,18 @@ class Axe(CraftWorldParallelDomainKnowledge):
             3: [
                 T(3, 3, [None, None, False, False, None, False], ['make1',]),
                 T(3, 5, [None, None, True, False, None, None], ['make0',]),
-                T(3, 5, [None, None, True, False, None, True], ['make0',]),
+                T(3, 5, [None, None, None, False, None, True], ['make0',]),
                 T(3, 6, [None, None, None, True, None, None], ['make0',]),
                 ],
             4: [
                 T(4, 4, [None, False, None, False, None, None], ['get_iron',]),
-                T(4, 5, [None, True, True, False, None, None], ['make0',]),
+                T(4, 5, [None, True, None, False, None, None], ['make0',]),
                 T(4, 6, [None, None, None, True, None, None], ['make0',]),
                 ],
             5: [
                 T(5, 5, [None, None, None, False, False, None], ['make0',]),
                 T(5, 6, [None, None, None, True, None, None], ['make0']),
-                T(5, 6, [None, None, None, True, True, None], ['make0']),
+                T(5, 6, [None, None, None, None, True, None], ['make0']),
                 ],
             6: [
                 T(6, 6, [None,] * 6, ['make0'])
@@ -311,7 +311,7 @@ class Gem(CraftWorldParallelDomainKnowledge):
                 T(1, 1, [None, False, False, False, False, None, False,], ['get_iron', 'make1']),
                 T(1, 3, [None, True, False, False, False, None, None,], ['make1']),
                 T(1, 4, [None, False, True, False, False, None, False], ['get_iron',]),
-                T(1, 4, [None, False, False, False, False, None, True], ['get_iron',]),
+                T(1, 4, [None, False, None, False, False, None, True], ['get_iron',]),
                 T(1, 5, [None, True, True, False, False, None, None], ['make0',]),
                 T(1, 6, [None, None, None, True, False, None, None], ['make0',]),
                 T(1, 7, [None, None, None, None, True, None, None], ['make0',]),
@@ -326,21 +326,21 @@ class Gem(CraftWorldParallelDomainKnowledge):
             3: [
                 T(3, 3, [None, None, False, False, False, None, False], ['make1',]),
                 T(3, 5, [None, None, True, False, False, None, None], ['make0',]),
-                T(3, 5, [None, None, True, False, False, None, True], ['make0',]),
+                T(3, 5, [None, None, None, False, False, None, True], ['make0',]),
                 T(3, 6, [None, None, None, True, False, None, None], ['make0',]),
                 T(3, 7, [None, None, None, None, True, None, None], ['make0',]),
                 ],
             4: [
                 T(4, 4, [None, False, None, False, False, None, None], ['get_iron',]),
-                T(4, 5, [None, True, True, False, False, None, None], ['make0',]),
+                T(4, 5, [None, True, None, False, False, None, None], ['make0',]),
                 T(4, 6, [None, None, None, True, False, None, None], ['make0',]),
                 T(4, 7, [None, None, None, None, True, None, None], ['make0',]),
                 ],
             5: [
                 T(5, 5, [None, None, None, False, False, False, None], ['make0',]),
                 T(5, 6, [None, None, None, True, False, None, None], ['make0']),
-                T(5, 6, [None, None, None, True, False, True, None], ['make0']),
-                T(5, 7, [None, None, None, None, True, True, None], ['make0']),
+                T(5, 6, [None, None, None, None, False, True, None], ['make0']),
+                T(5, 7, [None, None, None, None, True, None, None], ['make0']),
                 ],
             6: [
                 T(6, 6, [None, None, None, None, False, None, None], ['get_gem',]),
@@ -378,7 +378,7 @@ class Shears(CraftWorldParallelDomainKnowledge):
             1: [
                 T(1, 1, [None, False, False, False, False], ['get_iron', 'make1']),
                 T(1, 3, [None, True, False, False, None], ['make1']),
-                T(1, 4, [None, False, True, False, False], ['get_iron',]),
+                T(1, 4, [None, False, True, False, None], ['get_iron',]),
                 T(1, 4, [None, False, False, False, True], ['get_iron',]),
                 T(1, 5, [None, True, True, False, None], ['make1',]),
                 T(1, 6, [None, None, None, True, None], ['make1',]),
@@ -397,7 +397,7 @@ class Shears(CraftWorldParallelDomainKnowledge):
                 ],
             4: [
                 T(4, 4, [None, False, None, False, None], ['get_iron',]),
-                T(4, 5, [None, True, True, False, None], ['make1',]),
+                T(4, 5, [None, True, None, False, None], ['make1',]),
                 T(4, 6, [None, None, None, True, None], ['make1',]),
                 ],
             5: [
