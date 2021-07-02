@@ -29,6 +29,9 @@ class Struct:
             rec_entries[k] = rv
         self.__dict__.update(rec_entries)
 
+    def __contains__(self, item):
+        return item in self.__dict__.keys()
+
     def __str_helper(self, depth):
         lines = []
         for k, v in self.__dict__.items():
