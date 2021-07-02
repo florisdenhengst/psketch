@@ -224,6 +224,8 @@ class CraftState(object):
                 win.addch(HEIGHT-y + 2, x, ch1, color)
 
     def at_workshop(self, workshop_id):
+        # TODO FdH: Remove this hack to test impact of ap_ia
+        return False
         x, y = self.pos
         here = self.grid[x, y, :]
         workshop_thing_id = self.world.cookbook.index["workshop{}".format(workshop_id)]
