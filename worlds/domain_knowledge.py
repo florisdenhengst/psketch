@@ -378,11 +378,11 @@ class Gem(CraftWorldAutomatonDomainKnowledge):
                 T(5, 7, [None, None, None, None, True,], ['make0']),
                 ],
             6: [
-                T(6, 6, [None, None, None, None, False], ['make0']),
-                T(6, 7, [None, None, None, None, True], ['make0'])
+                T(6, 6, [None, None, None, None, False], ['get_gem']),
+                T(6, 7, [None, None, None, None, True], ['get_gem'])
                 ],
             7: [
-                T(7, 7, [None,] * 5, ['make0']),
+                T(7, 7, [None,] * 5, ['get_gem']),
                 ]
             }
 
@@ -643,11 +643,11 @@ class Gold(CraftWorldAutomatonDomainKnowledge):
                 T(3, 5, [None, None, None, True], ['make2']),
                 ],
             4: [
-                T(4, 4, [None, None, None, False,], ['make2']),
-                T(4, 5, [None, None, None, True,], ['make2']),
+                T(4, 4, [None, None, None, False,], ['get_gold']),
+                T(4, 5, [None, None, None, True,], ['get_gold']),
                 ],
             5: [
-                T(5, 5, [None,]*4, ['make2']),
+                T(5, 5, [None,]*4, ['get_gold']),
                 ]
             }
 
