@@ -632,7 +632,7 @@ class Gold(CraftWorldAutomatonDomainKnowledge):
                 T(0, 5, [None, None, None, True,], ['make2']),
                 ],
             1: [
-                T(1, 1, [None, None, False, False,], ['get_iron']),
+                T(1, 1, [None, False, False, False,], ['get_iron']),
                 T(1, 3, [None, True, False, False,], ['make2']),
                 T(1, 4, [None, None, True, False,], ['make2']),
                 T(1, 5, [None, None, None, True,], ['make2']),
