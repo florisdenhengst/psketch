@@ -205,10 +205,16 @@ class ActorCriticModel(object):
             self.i_task.append(self.trainer.task_index[tasks[i]])
             steps = tasks[i].steps
             steps = [self.trainer.subtask_index.indicesof(step) for step in steps]
-            self.dks.append(self.dk_model(steps, self.trainer.cookbook))
+            self.dks.append(self.dk_model.make(tasks[i].goal[1], steps, self.trainer.cookbook))
         # list storing the subtask for each episode
         self.i_subtask = [0 for _ in range(n_act_batch)]
+        # vector of metacontroller states for each episode
+        self.i_metacontroller_state = np.zeros(n_act_batch)
+        self.i_symbolic_action = [None,] * n_act_batch
+        self.i_action = [None,] * n_act_batch
         self.i_step = np.zeros((n_act_batch, 1))
+        self.i_total_step = np.zeros((n_act_batch, 1))
+        self.i_done = np.zeros((n_act_batch, 1))
         self.randoms = []
         for _ in range(n_act_batch):
             self.randoms.append(np.random.RandomState(self.next_actor_seed))
@@ -226,26 +232,46 @@ class ActorCriticModel(object):
         logging.info("loaded %s", path)
         self.saver.restore(self.session, path)
 
-    def experience(self, episode):
+    def experience(self, episode, logdebug=False):
         running_reward = 0
         shaped_running_reward = 0
         shaping_r = 0
-        for transition in episode[::-1]:
+        running_sa = None
+        # TODO FdH: remove
+        ep_len = len(episode)
+        running_sa = episode[-1].sa1
+        for i, transition in enumerate(episode[::-1]):
+            # TODO FdH: fix rolling sa
             if transition.a == self.STOP:
+#                logging.debug('STOP')
                 shaping_r = self.shaping_reward
+                running_sa = transition.sa1
             else:
                 shaping_r = 0
-            running_reward = running_reward * DISCOUNT + transition.r
-            shaped_running_reward = shaped_running_reward * DISCOUNT + shaping_r
-            n_transition = transition._replace(r=running_reward + shaped_running_reward)
+            running_reward = (running_reward * DISCOUNT) + transition.r
+            shaped_running_reward = (shaped_running_reward * DISCOUNT) + shaping_r
+            n_transition = transition._replace(r=running_reward + shaped_running_reward,
+                    sa1=running_sa)
+#            if logdebug:
+#                logging.debug("i: {}".format(i))
+#                logging.debug("running rewards: {} {}".format(running_reward, shaped_running_reward))
+#                logging.debug("transition: {} {} {} ".format(transition.a, transition.sa1, transition.r))
+#                logging.debug("n_transition: {} {} {} ".format(n_transition.a, n_transition.sa1, n_transition.r))
             if n_transition.a < self.STOP:
+#                if logdebug:
+#                    logging.debug('append')
                 self.experiences.append(n_transition)
             elif n_transition.a == self.FORCE_STOP:
                 # STOP due to too many timesteps
+#                if logdebug:
+#                    logging.debug('"reset"')
                 shaped_running_reward = 0
+                running_sa = transition.sa1
                 pass
             elif n_transition.a != self.STOP:
                 raise ValueError('Unknown action {}'.format(n_transition.a))
+#        if logdebug:
+#            logging.debug('===')
 
     def featurize(self, state, mstate):
         if self.config.model.featurize_plan:
@@ -259,51 +285,80 @@ class ActorCriticModel(object):
     def act(self, states):
         mstates = self.get_state()
         self.i_step += 1
+        self.i_total_step += 1
         by_mod = defaultdict(list)
         n_act_batch = len(self.i_subtask)
+        action = [None,] * n_act_batch
+        terminate = [None,] * n_act_batch
+        symbolic_action = [None,] * n_act_batch
+#        logging.debug('STEP: {}'.format(self.i_step[0]))
+#        logging.debug('TOTAL: {}'.format(self.i_total_step[0]))
+#        logging.debug('DK STATE ID: {} {}'.format(self.dks[0].state.id, self.dks[0].state.terminal))
+#        if states[0] is not None:
+#            logging.debug('GOT_WOOD: {}'.format(self.dks[0].check_inventory(states[0], 'wood')))
+#            logging.debug('GOT_PLANK: {}'.format(self.dks[0].check_inventory(states[0], 'plank')))
+#            logging.debug('AT WORKSHOP 0: {}'.format(states[0].at_workshop('0')))
+#        else:
+#            logging.debug('STATE 0 is none')
+        
+        for i, dk in enumerate(self.dks):
+            self.i_done[i] = self.i_done[i][0] or dk.state.terminal
+        
+        force_stops_i = np.logical_and(np.logical_not(self.i_done), self.i_step >= self.config.model.max_subtask_timesteps)
+        continue_i = np.logical_and(np.logical_not(self.i_done), np.logical_not(force_stops_i))
+#        logging.debug('DONE: {}'.format(self.i_done[0]))
+#        logging.debug('FORCE_STOP : {}'.format(force_stops_i[0]))
+#        logging.debug('CONTINUE: {}'.format(continue_i[0]))
+        
+        for i in np.where(force_stops_i)[0]:
+            action[i] = self.FORCE_STOP
+            symbolic_action[i] = None
+            # advance() automaton to random subsequent state
+            terminated = self.dks[i].advance(self.randoms[i])
+#            if i == 0:
+#                logging.debug('FORCE_STOP ADVANCE TO: {}'.format(self.dks[i].state.id))
+            if terminated:
+                terminate[i] = 1.
+            self.i_step[i] = 0.
 
-        # by_mod maps (task, subtask) tuples to indices of episodes in the batch
-        for i in range(n_act_batch):
-            by_mod[self.i_task[i], self.i_subtask[i]].append(i)
-
-
-        action = [None] * n_act_batch
-        terminate = [None] * n_act_batch
-        module_done = [False] * n_act_batch
-
-        for k, indices in by_mod.items():
-            i_task, i_subtask = k
-            if i_subtask >= len(self.subtasks[indices[0]]):
-                continue
-            actor = self.actor
-            feed_dict = {
-                self.inputs.t_feats: [self.featurize(states[i], mstates[i]) for i in indices],
-            }
-            if self.config.model.use_args:
-                feed_dict[self.inputs.t_arg] = [mstates[i].arg for i in indices]
-
-            logprobs = self.session.run([actor.t_probs], feed_dict=feed_dict)[0]
-            probs = np.exp(logprobs)
-            for pr, i in zip(probs, indices):
-
-                if self.i_step[i] >= self.config.model.max_subtask_timesteps:
-                    # Force the 'STOP' action
-                    a = self.FORCE_STOP
-                else:
-                    a = self.randoms[i].choice(self.n_net_actions, p=pr)
-                if self.dks[i].tick(states[i], a):
-                    # Force the 'STOP' action due to subgoal
-                    #logging.debug("Force STOP: {} ({}->{}):\n{}".format(
-                    #    prev_goal,
-                    #        prev_a_lab, a, states[i].pp()))
-                    a = self.STOP
-                if a == self.STOP or a == self.FORCE_STOP:
-                    self.i_subtask[i] += 1
-                    self.i_step[i] = 0.
-                t = self.i_subtask[i] >= len(self.subtasks[indices[0]])
-                action[i] = a
-                terminate[i] = t
-        return action, terminate
+        # TODO FdH: vectorize this loop if slow, esp. tensorflow self.session.run() calls
+        # if not FORCE_STOP:
+        for i in np.where(continue_i)[0]:
+            # determine available SAs
+            # tick with current state and previous! action
+            if states[i] is None:
+                raise ValueError('State is None for {}'.format(i))
+            symbolic_actions, advanced, terminated = self.dks[i].tick(states[i], self.i_action[i])
+#            if i == 0:
+#                logging.debug('ADV, TERM: {}, {}'.format(advanced, terminated))
+            if terminated:
+                terminate[i] = 1.
+            if advanced:
+                action[i] = self.STOP
+                symbolic_action[i] = self.i_symbolic_action[i]
+                self.i_step[i] = 0.0
+            else:
+                # collect value estimates for all available SAs
+                feed_dict = {
+                    self.inputs.t_feats: [self.featurize(states[i], mstates[i])],
+                }
+                if self.config.model.use_args:
+                    feed_dict[self.inputs.t_arg] = [mstates[i].arg]
+#                logging.debug('actor_i: {}'.format(actor_i))
+                    # TODO FdH: remove debug line
+                symbolic_action[i] = None
+                actor = self.actor
+                logprobs = self.session.run([actor.t_probs], feed_dict=feed_dict)[0][0]
+                probs = np.exp(logprobs)
+#                if i == 0:
+#                    logging.debug('probs: {} '.format(probs))
+#                logging.debug('ACT{}: actor {} probs {}'.format(i, selected_sa, probs))
+                action[i] = self.randoms[i].choice(self.n_net_actions, p=probs)
+#                logging.debug('ACT{}: actor {} acts {}'.format(i, selected_sa, action[i]))
+#        logging.debug('action: {}'.format(action[0]))
+        self.i_symbolic_action = symbolic_action
+        self.i_action = action
+        return action, terminate, symbolic_action
 
     def get_state(self):
         out = []
@@ -359,7 +414,7 @@ class ActorCriticModel(object):
             # FdH: is i_batch ever > 0? since len(all_exps) is always < N_BATCH (subset of)
             for i_batch in range(int(np.ceil(1. * len(all_exps) / N_BATCH))):
                 exps = all_exps[i_batch * N_BATCH : (i_batch + 1) * N_BATCH]
-                s1, m1, a, s2, m2, r = zip(*exps)
+                s1, m1, sa1, a, s2, m2, r = zip(*exps)
                 feats1 = [self.featurize(s, m) for s, m in zip(s1, m1)]
                 args1 = [m.arg for m in m1]
                 # steps are the symbolic actions to in a task
