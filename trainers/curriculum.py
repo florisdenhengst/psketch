@@ -88,7 +88,7 @@ class CurriculumTrainer(object):
         while not all(done) and timer > 0:
             # takes N_BATCH steps simultaneously
             mstates_before = model.get_state()
-            action, terminate, symbolic_act = model.act(states_before)
+            action, terminate, symbolic_act, module_done = model.act(states_before)
             mstates_after = model.get_state()
             states_after = [None for _ in range(N_BATCH)]
             for i in range(N_BATCH):
@@ -108,7 +108,7 @@ class CurriculumTrainer(object):
                     assert action[i] is not None
                     transitions[i].append(Transition(
                             states_before[i], mstates_before[i], symbolic_act[i], action[i], 
-                            states_after[i], mstates_after[i], reward))
+                            states_after[i], mstates_after[i], reward, module_done[i]))
                     total_reward += reward
 
                 if terminate[i]:
@@ -177,9 +177,9 @@ class CurriculumTrainer(object):
                         for e_i, e in enumerate(episodes):
                             # TODO FdH: remove logdebug nonsense
                             if e_i == 0:
-                                logdebug = False
+                                logdebug = True 
                             else:
-                                logdebug = True
+                                logdebug = False
                             model.experience(e, logdebug)
                         err = model.train()
                         errs.append(err)

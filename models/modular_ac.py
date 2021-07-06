@@ -221,47 +221,60 @@ class ModularACModel(object):
             self.i_task.append(self.trainer.task_index[tasks[i]])
             steps = tasks[i].steps
             steps = [self.trainer.subtask_index.indicesof(step) for step in steps]
-            self.dks.append(self.dk_model(steps, self.trainer.cookbook))
+            self.dks.append(self.dk_model.make(tasks[i].goal[1], steps, self.trainer.cookbook))
         # list storing the subtask for each episode
         self.i_subtask = [0 for _ in range(n_act_batch)]
         self.i_step = np.zeros((n_act_batch, 1))
         self.randoms = []
+        self.i_total_step = np.zeros((n_act_batch, 1))
         for _ in range(n_act_batch):
             self.randoms.append(np.random.RandomState(self.next_actor_seed))
             self.next_actor_seed += 1
 
     def save(self):
         self.saver.save(self.session, 
-                os.path.join(self.config.experiment_dir, "modular_ac.chk"))
+                os.path.join(self.config.experiment_dir, "ac.chk"))
 
     def load(self):
         """
         Loads parameters from file.
         """
-        path = os.path.join(self.config.experiment_dir, "modular_ac.chk")
+        path = os.path.join(self.config.experiment_dir, "ac.chk")
         logging.info("loaded %s", path)
         self.saver.restore(self.session, path)
 
-    def experience(self, episode):
+    def experience(self, episode, logdebug=False):
         running_reward = 0
         shaped_running_reward = 0
         shaping_r = 0
-        for transition in episode[::-1]:
-            if transition.a == self.STOP:
+        for i, transition in enumerate(episode[::-1]):
+            if transition.md:
                 shaping_r = self.shaping_reward
             else:
                 shaping_r = 0
+            rr = running_reward
+            srr = shaped_running_reward
             running_reward = running_reward * DISCOUNT + transition.r
             shaped_running_reward = shaped_running_reward * DISCOUNT + shaping_r
             n_transition = transition._replace(r=running_reward + shaped_running_reward)
-            if n_transition.a < self.STOP:
+#            if logdebug:
+#                logging.debug("i: {}".format(i))
+#                logging.debug("running rewards: {} {}".format(running_reward, shaped_running_reward))
+#                logging.debug("transition: {} {} {} ".format(transition.a, transition.sa1, transition.r))
+            if n_transition.a < self.n_actions:
+#                if logdebug:
+#                    logging.debug('append')
                 self.experiences.append(n_transition)
             elif n_transition.a == self.FORCE_STOP:
                 # STOP due to too many timesteps
+#                if logdebug:
+#                    logging.debug('"reset"')
                 shaped_running_reward = 0
                 pass
             elif n_transition.a != self.STOP:
                 raise ValueError('Unknown action {}'.format(n_transition.a))
+#        if logdebug:
+#            logging.debug('===')
 
     def featurize(self, state, mstate):
         if self.config.model.featurize_plan:
@@ -275,16 +288,24 @@ class ModularACModel(object):
     def act(self, states):
         mstates = self.get_state()
         self.i_step += 1
+        self.i_total_step += 1
         by_mod = defaultdict(list)
         n_act_batch = len(self.i_subtask)
+        action = [None,] * n_act_batch
+        terminate = [None,] * n_act_batch
+        symbolic_action = [None,] * n_act_batch
+        module_done = [None] * n_act_batch
+#        logging.debug('STEP: {}'.format(self.i_step[0]))
+#        logging.debug('TOTAL: {}'.format(self.i_total_step[0]))
+#        logging.debug('DK STATE ID: {} {}'.format(self.dks[0].state.id, self.dks[0].state.terminal))
 
         # by_mod maps (task, subtask) tuples to indices of episodes in the batch
         for i in range(n_act_batch):
             by_mod[self.i_task[i], self.i_subtask[i]].append(i)
 
-
         action = [None] * n_act_batch
         terminate = [None] * n_act_batch
+        module_done = [False] * n_act_batch
 
         for k, indices in by_mod.items():
             i_task, i_subtask = k
@@ -306,19 +327,24 @@ class ModularACModel(object):
                     a = self.FORCE_STOP
                 else:
                     a = self.randoms[i].choice(self.n_net_actions, p=pr)
-                if self.dks[i].tick(states[i], a):
+                if self.dks[i].tick(states[i], None)[1]:
                     # Force the 'STOP' action due to subgoal
                     #logging.debug("Force STOP: {} ({}->{}):\n{}".format(
                     #    prev_goal,
                     #        prev_a_lab, a, states[i].pp()))
-                    a = self.STOP
+                    module_done[i] = True
                 if a == self.STOP or a == self.FORCE_STOP:
+#                    if i == 0:
+#                        logging.debug('ADVANCE: {}'.format(self.dks[i].state))
+                    self.dks[i].advance(self.randoms[i], True)
+#                    if i == 0:
+#                        logging.debug('ADVANCE: {}'.format(self.dks[i].state))
                     self.i_subtask[i] += 1
                     self.i_step[i] = 0.
                 t = self.i_subtask[i] >= len(self.subtasks[indices[0]])
                 action[i] = a
                 terminate[i] = t
-        return action, terminate
+        return action, terminate, symbolic_action, module_done
 
     def get_state(self):
         out = []
@@ -374,7 +400,7 @@ class ModularACModel(object):
             # FdH: is i_batch ever > 0? since len(all_exps) is always < N_BATCH (subset of)
             for i_batch in range(int(np.ceil(1. * len(all_exps) / N_BATCH))):
                 exps = all_exps[i_batch * N_BATCH : (i_batch + 1) * N_BATCH]
-                s1, m1, a, s2, m2, r = zip(*exps)
+                s1, m1, sa1, a, s2, m2, r, md = zip(*exps)
                 feats1 = [self.featurize(s, m) for s, m in zip(s1, m1)]
                 args1 = [m.arg for m in m1]
                 # steps are the symbolic actions to in a task

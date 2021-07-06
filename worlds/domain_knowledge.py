@@ -127,7 +127,7 @@ class CraftWorldAutomatonDomainKnowledge(CraftWorldDomainKnowledge):
         self.prev_obs = observation
         return symbolic_actions, advance, self.state.terminal
 
-    def advance(self, random):
+    def advance(self, random, first=False):
         # get the available successors
         # sample one uniformly with random seed
         target_nodes = [t.target for t in self.transitions[self.state.id] if t.target != self.state.id]
@@ -136,8 +136,14 @@ class CraftWorldAutomatonDomainKnowledge(CraftWorldDomainKnowledge):
             target_candidates = target_nodes
         else:
             target_candidates = [t_id for t_id in target_nodes if not self.states[t_id].terminal]
-        target = random.choice(target_candidates)
-        assert target != self.state.id
+        if first:
+            if len(target_candidates) == 0:
+                target = self.state.id
+            else:
+                target = target_candidates[0]
+        else:
+            target = random.choice(target_candidates)
+            assert target != self.state.id
         self.state = self.states[target]
         return self.state.terminal
 
@@ -356,26 +362,26 @@ class Gem(CraftWorldAutomatonDomainKnowledge):
                 T(0, 1, [True, None, False, False, False,], ['get_iron',]),
                 T(0, 4, [None, False, True, False, False,], ['get_iron',]),
                 T(0, 5, [None, True, True, False, False,], ['make0',]),
-                T(0, 6, [None, None, None, True, False,], ['make0',]),
-                T(0, 7, [None, None, None, None, True,], ['make0',]),
+                T(0, 6, [None, None, None, True, False,], ['get_gem',]),
+                T(0, 7, [None, None, None, None, True,], ['get_gem',]),
                 ],
             1: [
                 T(1, 1, [None, None, False, False, False,], ['make1']),
                 T(1, 4, [None, False, True, False, False,], ['get_iron',]),
                 T(1, 5, [None, True, True, False, False,], ['make0',]),
-                T(1, 6, [None, None, None, True, False,], ['make0',]),
-                T(1, 7, [None, None, None, None, True,], ['make0',]),
+                T(1, 6, [None, None, None, True, False,], ['get_gem',]),
+                T(1, 7, [None, None, None, None, True,], ['get_gem',]),
                 ],
             4: [
                 T(4, 4, [None, False, None, False, False,], ['get_iron',]),
                 T(4, 5, [None, True, None, False, False,], ['make0',]),
-                T(4, 6, [None, None, None, True, False,], ['make0',]),
-                T(4, 7, [None, None, None, None, True,], ['make0',]),
+                T(4, 6, [None, None, None, True, False,], ['get_gem',]),
+                T(4, 7, [None, None, None, None, True,], ['get_gem',]),
                 ],
             5: [
                 T(5, 5, [None, None, None, False, False,], ['make0',]),
-                T(5, 6, [None, None, None, True, False,], ['make0']),
-                T(5, 7, [None, None, None, None, True,], ['make0']),
+                T(5, 6, [None, None, None, True, False,], ['get_gem']),
+                T(5, 7, [None, None, None, None, True,], ['get_gem']),
                 ],
             6: [
                 T(6, 6, [None, None, None, None, False], ['get_gem']),
