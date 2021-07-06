@@ -5,7 +5,7 @@ model:
   name: ModularACModel
   shaping_reward: 0
   use_args: false
-name: craft_modular-8-forcestop-0
+name: craft_modular-8-0
 recipes: resources/craft/recipes.yaml
 seed: 8
 trainer:
