@@ -291,6 +291,7 @@ class ActorCriticModel(object):
         action = [None,] * n_act_batch
         terminate = [None,] * n_act_batch
         symbolic_action = [None,] * n_act_batch
+        module_done = [False] * n_act_batch
 #        logging.debug('STEP: {}'.format(self.i_step[0]))
 #        logging.debug('TOTAL: {}'.format(self.i_total_step[0]))
 #        logging.debug('DK STATE ID: {} {}'.format(self.dks[0].state.id, self.dks[0].state.terminal))
@@ -358,7 +359,7 @@ class ActorCriticModel(object):
 #        logging.debug('action: {}'.format(action[0]))
         self.i_symbolic_action = symbolic_action
         self.i_action = action
-        return action, terminate, symbolic_action
+        return action, terminate, symbolic_action, module_done
 
     def get_state(self):
         out = []
@@ -414,7 +415,7 @@ class ActorCriticModel(object):
             # FdH: is i_batch ever > 0? since len(all_exps) is always < N_BATCH (subset of)
             for i_batch in range(int(np.ceil(1. * len(all_exps) / N_BATCH))):
                 exps = all_exps[i_batch * N_BATCH : (i_batch + 1) * N_BATCH]
-                s1, m1, sa1, a, s2, m2, r = zip(*exps)
+                s1, m1, sa1, a, s2, m2, r, _ = zip(*exps)
                 feats1 = [self.featurize(s, m) for s, m in zip(s1, m1)]
                 args1 = [m.arg for m in m1]
                 # steps are the symbolic actions to in a task
