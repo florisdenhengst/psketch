@@ -360,26 +360,36 @@ class ModularActorModularCriticModel(object):
                 if self.config.model.use_args:
                     feed_dict[self.inputs.t_arg] = [mstates[i].arg]
                 if len(symbolic_actions) > 1:
-                    v_sas = []
-#                    logging.debug('ACT{}: available acts {}'.format(i, symbolic_actions))
-                    for sa in symbolic_actions:
-                        sa_i = self.trainer.symbolic_action_index.index(sa)
-#                        logging.debug("SA in INDEX: {}".format(sa))
-                        critic = self.critics[sa] # critic for this task + symbolic action
-                        value = self.session.run([critic.t_value], feed_dict=feed_dict)[0]
-#                        logging.debug('ACT{}: critic {} value {}'.format(i, sa_i, symbolic_actions))
-                        v_sas.append((sa_i, value))
-#                    logging.debug('ACT{}: critics predict {}'.format(i, v_sas))
-                    # select SA with highest value
-                    actor_i, value = max(v_sas, key=lambda x: x[1])
-#                    logging.debug('ACT{}: max critic predict {}'.format(i, actor_i))
+                    if self.i_symbolic_action[i] in symbolic_actions:
+                        actor_i = self.trainer.symbolic_action_index.index(symbolic_actions[0])
+                    else:
+                        v_sas = []
+#                        if i == 0:
+#                            logging.debug('ACT{}: available acts {}'.format(i, symbolic_actions))
+                        for sa in symbolic_actions:
+                            sa_i = self.trainer.symbolic_action_index.index(sa)
+#                            if i == 0:
+#                                logging.debug("SA in INDEX: {}".format(sa))
+                            critic = self.critics[sa] # critic for this task + symbolic action
+                            value = self.session.run([critic.t_value], feed_dict=feed_dict)[0]
+#                            if i == 0:
+#                                logging.debug('ACT{}: critic {} value {}'.format(i, sa_i, symbolic_actions))
+                            v_sas.append((sa_i, value))
+#                        if i == 0:
+#                            logging.debug('ACT{}: critics predict {}'.format(i, v_sas))
+                        # select SA with highest value
+                        actor_i, value = max(v_sas, key=lambda x: x[1])
+#                    actor_i, value = max(v_sas, key=lambda x: x[1]
+#                    if i == 0:
+#                        logging.debug('ACT{}: sample critic {}'.format(i, actor_i))
                 else:
 #                    if i == 0:
 #                        logging.debug('SA: {}'.format(symbolic_actions[0]))
                     actor_i = self.trainer.symbolic_action_index.index(symbolic_actions[0])
 #                    if i == 0:
 #                        logging.debug('actor_i: {} '.format(actor_i))
-#                logging.debug('actor_i: {}'.format(actor_i))
+#                if i == 0:
+#                    logging.debug('actor_i: {}'.format(actor_i))
                 selected_sa = self.trainer.symbolic_action_index.indicesof(actor_i)
 #                if i == 0:
 #                    logging.debug('selected sa: {} '.format(selected_sa))
